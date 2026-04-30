@@ -1,0 +1,28 @@
+{
+  "name": "dns-health-extension",
+  "description": "SPF, DMARC, and DKIM checks for the active tab hostname (Chrome & Edge).",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "compile": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "tldts": "^7.0.29"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.40",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5",
+    "wxt": "^0.20.25"
+  }
+}
