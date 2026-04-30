@@ -1,6 +1,7 @@
 {
   "name": "dns-health-extension",
   "description": "SPF, DMARC, and DKIM checks for the active tab hostname (Chrome & Edge).",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "version": "0.1.0",
   "type": "module",
