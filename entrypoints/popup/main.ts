@@ -95,6 +95,12 @@ function truncate(s: string, max: number): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
+/** Same rounding as overall score; omit trailing “.0” for whole numbers. */
+function formatScoreTenth(n: number): string {
+  const r = Math.round(n * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}
+
 function mxtoolboxEmailHealthUrl(domain: string): string {
   return `https://mxtoolbox.com/emailhealth/${encodeURIComponent(domain)}`;
 }
@@ -105,7 +111,7 @@ function renderScoreRing(overall: number): string {
   return `
     <div class="score-ring" style="--score-deg: ${deg}deg" aria-hidden="true">
       <div class="score-ring__inner">
-        <span class="score-ring__value">${overall.toFixed(1)}</span>
+        <span class="score-ring__value">${formatScoreTenth(overall)}</span>
         <span class="score-ring__max">/ 10</span>
       </div>
     </div>
@@ -164,7 +170,7 @@ function renderProtocolCard(
         ${titleHtml}
         <span class="${badgeClass(score.status)}">${statusLabel(score.status)}</span>
       </div>
-      <div class="card__points">${score.points.toFixed(1)} <span class="card__max">/ ${score.max}</span></div>
+      <div class="card__points">${formatScoreTenth(score.points)} <span class="card__max">/ ${score.max}</span></div>
       <p class="card__detail">${escapeHtml(score.detail)}</p>
       ${renderGradeBreakdown(breakdown)}
       ${rawBlock}

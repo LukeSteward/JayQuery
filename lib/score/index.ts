@@ -61,7 +61,8 @@ export function scoreSpf(a: SpfAnalysis): ProtocolScore {
 
   switch (a.allQualifier) {
     case 'fail':
-      p += 1.55;
+      // Base 1.2 + 1.8 = SPF_MAX (3) for ideal: single record, -all, lookup cap OK.
+      p += 1.8;
       break;
     case 'softfail':
       p += 1.15;

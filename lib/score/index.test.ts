@@ -10,6 +10,17 @@ import {
 } from '@/lib/score';
 
 describe('scoring', () => {
+  it('SPF with -all and within lookup cap reaches full SPF points', () => {
+    expect(scoreSpf(analyzeSpf(['v=spf1 -all'])).points).toBe(3);
+    expect(
+      scoreSpf(
+        analyzeSpf([
+          'v=spf1 include:a.example include:b.example include:c.example include:d.example include:e.example -all',
+        ]),
+      ).points,
+    ).toBe(3);
+  });
+
   it('computes overall from parts', () => {
     const spf = scoreSpf(analyzeSpf(['v=spf1 -all']));
     const dmarc = scoreDmarc(
