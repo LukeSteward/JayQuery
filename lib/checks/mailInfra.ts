@@ -37,6 +37,11 @@ function foldSeverity(statuses: HealthStatus[]): HealthStatus {
   return 'pass';
 }
 
+/** "1 MX record detected" vs "4 MX records detected". */
+function mxRecordsDetectedPhrase(n: number): string {
+  return n === 1 ? '1 MX record detected' : `${n} MX records detected`;
+}
+
 async function checkMx(domain: string): Promise<MailInfraCheck> {
   const mx = await resolveMx(domain);
   if (mx.length === 0) {
@@ -66,14 +71,10 @@ async function checkMx(domain: string): Promise<MailInfraCheck> {
   }
   const raw = mx.map((m) => `${m.priority} ${m.exchange}`).join('\n');
   const { identified, allSameProvider } = analyzeMxProviderGroup(mx, domain);
-  const lines = [
-    `${mx.length} MX record(s).`,
-    ...mx.slice(0, 6).map((m) => `${m.priority} ${m.exchange}`),
-  ];
-  if (mx.length > 6) {
-    lines.push(`… +${mx.length - 6} more`);
-  }
+
+  let lines: string[];
   if (identified) {
+    lines = [mxRecordsDetectedPhrase(mx.length)];
     if (!allSameProvider) {
       lines.push(`Identified provider (MX): ${identified.name}`);
     }
@@ -83,6 +84,15 @@ async function checkMx(domain: string): Promise<MailInfraCheck> {
       );
     }
   } else {
+    const label =
+      mx.length === 1 ? '1 MX record.' : `${mx.length} MX records.`;
+    lines = [
+      label,
+      ...mx.slice(0, 6).map((m) => `${m.priority} ${m.exchange}`),
+    ];
+    if (mx.length > 6) {
+      lines.push(`… +${mx.length - 6} more`);
+    }
     lines.push(
       'MX host(s) did not match known hosting / security profiles (custom or unlisted provider).',
     );
