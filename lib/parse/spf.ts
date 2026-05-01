@@ -1,5 +1,33 @@
 const SPF_PREFIX = 'v=spf1';
 
+function normalizeSpfHostname(s: string): string {
+  return s.toLowerCase().replace(/\.$/, '').trim();
+}
+
+/**
+ * Whether any `v=spf1` TXT uses `include:` for the given hostname (exact match after normalization).
+ */
+export function spfTxtRecordsInclude(
+  txtRecords: string[],
+  includeHostname: string,
+): boolean {
+  const want = normalizeSpfHostname(includeHostname);
+  if (!want) return false;
+
+  const spfLike = txtRecords.filter((t) =>
+    t.trim().toLowerCase().startsWith(SPF_PREFIX),
+  );
+
+  for (const record of spfLike) {
+    for (const token of record.trim().split(/\s+/)) {
+      const m = token.match(/^(?:[+\-~?])?include:([a-z0-9._-]+)/i);
+      if (!m) continue;
+      if (normalizeSpfHostname(m[1]) === want) return true;
+    }
+  }
+  return false;
+}
+
 export type SpfAnalysis = {
   /** At least one TXT starting with v=spf1 */
   present: boolean;

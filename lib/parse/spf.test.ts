@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeSpf } from '@/lib/parse/spf';
+import { analyzeSpf, spfTxtRecordsInclude } from '@/lib/parse/spf';
+
+describe('spfTxtRecordsInclude', () => {
+  it('returns true when include matches', () => {
+    expect(
+      spfTxtRecordsInclude(
+        ['v=spf1 include:spf.protection.outlook.com -all'],
+        'spf.protection.outlook.com',
+      ),
+    ).toBe(true);
+  });
+
+  it('honors mechanism qualifiers on include', () => {
+    expect(
+      spfTxtRecordsInclude(['v=spf1 +include:_spf.google.com ~all'], '_spf.google.com'),
+    ).toBe(true);
+  });
+
+  it('returns false when include is absent', () => {
+    expect(
+      spfTxtRecordsInclude(['v=spf1 include:other.example -all'], 'spf.protection.outlook.com'),
+    ).toBe(false);
+  });
+
+  it('ignores non-SPF TXT', () => {
+    expect(spfTxtRecordsInclude(['not spf'], 'spf.example.com')).toBe(false);
+  });
+});
 
 describe('analyzeSpf', () => {
   it('detects missing SPF', () => {

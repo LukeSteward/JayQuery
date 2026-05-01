@@ -4,6 +4,7 @@ import {
   type CheckMode,
   type CheckResult,
 } from '@/lib/checkDomain';
+import type { SpfMailProviderHint } from '@/lib/checks/mailProviderSpfHint';
 import { getActiveTabHostname } from '@/lib/tabHost';
 import type { FullScore, GradeLine, HealthStatus } from '@/lib/score';
 import {
@@ -121,6 +122,24 @@ function renderGradeBreakdown(lines: GradeLine[]): string {
     .join('')}</ul>`;
 }
 
+function renderSpfMailProviderHint(h: SpfMailProviderHint): string {
+  const lineBlock = h.lines.length
+    ? `<ul class="spf-provider-hint__lines">${h.lines
+        .map((t) => `<li>${escapeHtml(t)}</li>`)
+        .join('')}</ul>`
+    : '';
+  return `
+    <div class="spf-provider-hint" role="note" aria-label="MX provider SPF reference (not scored)">
+      <p class="spf-provider-hint__kicker">MX provider profile — not part of score</p>
+      <div class="spf-provider-hint__head">
+        <span class="spf-provider-hint__provider">${escapeHtml(h.providerName)}</span>
+        <span class="${badgeClass(h.status)}">${statusLabel(h.status)}</span>
+      </div>
+      <p class="spf-provider-hint__summary">${escapeHtml(h.summary)}</p>
+      ${lineBlock}
+    </div>`;
+}
+
 function renderProtocolCard(
   title: string,
   score: FullScore['spf'],
@@ -128,6 +147,7 @@ function renderProtocolCard(
   rawSnippet: string | null,
   breakdown: GradeLine[],
   titleInfoTitle?: string,
+  supplementalFooter?: string,
 ): string {
   const rawBlock = rawSnippet
     ? `<details class="raw"><summary>${rawLabel}</summary><pre class="raw__pre">${escapeHtml(truncate(rawSnippet, 900))}</pre></details>`
@@ -148,6 +168,7 @@ function renderProtocolCard(
       <p class="card__detail">${escapeHtml(score.detail)}</p>
       ${renderGradeBreakdown(breakdown)}
       ${rawBlock}
+      ${supplementalFooter ?? ''}
     </article>
   `;
 }
@@ -274,6 +295,10 @@ function renderResult(result: CheckResult): void {
           'SPF record',
           result.spfRecords[0] ?? null,
           result.spfBreakdown,
+          undefined,
+          result.spfMailProviderHint
+            ? renderSpfMailProviderHint(result.spfMailProviderHint)
+            : undefined,
         )}
         ${renderProtocolCard(
           'DMARC',

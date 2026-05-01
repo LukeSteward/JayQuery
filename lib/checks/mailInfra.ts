@@ -10,6 +10,7 @@ import { resolveTxt } from '@/lib/dns/queryTxt';
 import { checkM365Tenant } from '@/lib/checks/microsoft365Tenant';
 import { analyzeMtaStsTxt } from '@/lib/parse/mtaStsRecord';
 import { analyzeTlsRptTxt } from '@/lib/parse/tlsRptRecord';
+import { analyzeMxProviderGroup } from '@/lib/mailProviders/identifyMxProvider';
 import type { HealthStatus } from '@/lib/score/common';
 
 export type MailInfraCheck = {
@@ -19,6 +20,14 @@ export type MailInfraCheck = {
   summary: string;
   lines: string[];
   raw?: string;
+  /**
+   * When MX matched a known profile — used only to build the informational SPF supplement
+   * on the main SPF card (no scoring).
+   */
+  providerProfile?: {
+    name: string;
+    expectedSpfInclude?: string;
+  };
 };
 
 function foldSeverity(statuses: HealthStatus[]): HealthStatus {
@@ -56,6 +65,7 @@ async function checkMx(domain: string): Promise<MailInfraCheck> {
     };
   }
   const raw = mx.map((m) => `${m.priority} ${m.exchange}`).join('\n');
+  const { identified, allSameProvider } = analyzeMxProviderGroup(mx, domain);
   const lines = [
     `${mx.length} MX record(s).`,
     ...mx.slice(0, 6).map((m) => `${m.priority} ${m.exchange}`),
@@ -63,13 +73,45 @@ async function checkMx(domain: string): Promise<MailInfraCheck> {
   if (mx.length > 6) {
     lines.push(`… +${mx.length - 6} more`);
   }
+  if (identified) {
+    if (!allSameProvider) {
+      lines.push(`Identified provider (MX): ${identified.name}`);
+    }
+    if (identified.dkimSelectors?.length) {
+      lines.push(
+        `Suggested DKIM selectors (profile): ${identified.dkimSelectors.join(', ')}`,
+      );
+    }
+  } else {
+    lines.push(
+      'MX host(s) did not match known hosting / security profiles (custom or unlisted provider).',
+    );
+  }
+
+  const summary =
+    identified && allSameProvider
+      ? identified.name
+      : identified
+        ? `${mx.length} mail exchanger(s) — ${identified.name}`
+        : `${mx.length} mail exchanger(s)`;
+
+  const providerProfile = identified
+    ? {
+        name: identified.name,
+        ...(identified.expectedSpfInclude?.trim()
+          ? { expectedSpfInclude: identified.expectedSpfInclude.trim() }
+          : {}),
+      }
+    : undefined;
+
   return {
     id: 'mx',
     title: 'MX',
     status: 'pass',
-    summary: `${mx.length} mail exchanger(s)`,
+    summary,
     lines,
     raw,
+    ...(providerProfile ? { providerProfile } : {}),
   };
 }
 

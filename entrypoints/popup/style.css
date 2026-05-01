@@ -544,6 +544,54 @@ body {
   margin-bottom: 2px;
 }
 
+.spf-provider-hint {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.spf-provider-hint__kicker {
+  margin: 0 0 8px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.spf-provider-hint__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.spf-provider-hint__provider {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.spf-provider-hint__summary {
+  margin: 0 0 6px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.spf-provider-hint__lines {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.72rem;
+  color: #a8afbf;
+  line-height: 1.4;
+}
+
+.spf-provider-hint__lines li {
+  margin-bottom: 2px;
+}
+
 .badge {
   font-size: 0.65rem;
   font-weight: 600;

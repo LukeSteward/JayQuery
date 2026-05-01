@@ -1,5 +1,9 @@
 import { getDomain } from 'tldts';
 import { runMailInfraChecks, type MailInfraCheck } from '@/lib/checks/mailInfra';
+import {
+  buildMailProviderSpfHint,
+  type SpfMailProviderHint,
+} from '@/lib/checks/mailProviderSpfHint';
 import { resolveTxtDetailed } from '@/lib/dns/queryTxt';
 import type { TxtRecordsDetailed } from '@/lib/dns/dohJson';
 import { analyzeSpf } from '@/lib/parse/spf';
@@ -45,6 +49,11 @@ export type CheckResult = {
   mailInfra: MailInfraCheck[];
   /** True when that pillar hit non-definitive DNS and strict mode applied. */
   emailAuthDnsError: { spf: boolean; dmarc: boolean; dkim: boolean };
+  /**
+   * Inbound MX provider SPF include check at the organizational domain — informational only;
+   * does not change {@link CheckResult.full} scores.
+   */
+  spfMailProviderHint?: SpfMailProviderHint;
 };
 
 function mergeTxtForDkim(chunks: string[]): string | null {
@@ -105,11 +114,28 @@ export async function runDnsCheck(
   const { tab, orgDomain, queryHost } = resolveCheckTargets(tabHostname, mode);
   const dmarcFqdn = `_dmarc.${orgDomain}`;
 
+  const orgSpfPromise = resolveTxtDetailed(orgDomain);
   const [spfDetailed, dmarcDetailed, mailInfra] = await Promise.all([
-    resolveTxtDetailed(queryHost),
+    queryHost === orgDomain
+      ? orgSpfPromise
+      : resolveTxtDetailed(queryHost),
     resolveTxtDetailed(dmarcFqdn),
     runMailInfraChecks(orgDomain),
   ]);
+  const orgSpfDetailed =
+    queryHost === orgDomain ? spfDetailed : await orgSpfPromise;
+
+  const mxCard = mailInfra.find((c) => c.id === 'mx');
+  const prof = mxCard?.providerProfile;
+  const spfMailProviderHint =
+    prof?.expectedSpfInclude?.trim()
+      ? buildMailProviderSpfHint(
+          orgDomain,
+          orgSpfDetailed,
+          prof.expectedSpfInclude,
+          prof.name,
+        )
+      : undefined;
 
   const spfTxts = analysisStrings(spfDetailed, treatDnsAsFail);
   const dmarcTxts = analysisStrings(dmarcDetailed, treatDnsAsFail);
@@ -203,6 +229,7 @@ export async function runDnsCheck(
     dmarcBreakdown,
     dkimBreakdown,
     mailInfra,
+    spfMailProviderHint,
     emailAuthDnsError: {
       spf: spfDnsErr,
       dmarc: dmarcDnsErr,
