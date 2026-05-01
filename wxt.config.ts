@@ -5,11 +5,12 @@ export default defineConfig({
   manifest: {
     name: 'DNS Health Check',
     description:
-      'SPF, DMARC, DKIM score plus MX, NS, MTA-STS, TLS-RPT, DNSSEC via DNS-over-HTTPS.',
+      'SPF, DMARC, DKIM score plus MX, NS, MTA-STS, TLS-RPT, DNSSEC via DoH, and Entra OIDC tenant probe.',
     permissions: ['activeTab'],
     host_permissions: [
       'https://cloudflare-dns.com/*',
       'https://dns.google/*',
+      'https://login.microsoftonline.com/*',
     ],
     action: {
       default_title: 'DNS Health',

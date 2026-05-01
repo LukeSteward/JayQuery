@@ -7,12 +7,13 @@ import {
   type DohResult,
 } from '@/lib/dns/dohJson';
 import { resolveTxt } from '@/lib/dns/queryTxt';
+import { checkM365Tenant } from '@/lib/checks/microsoft365Tenant';
 import { analyzeMtaStsTxt } from '@/lib/parse/mtaStsRecord';
 import { analyzeTlsRptTxt } from '@/lib/parse/tlsRptRecord';
 import type { HealthStatus } from '@/lib/score/common';
 
 export type MailInfraCheck = {
-  id: 'mx' | 'ns' | 'mtaSts' | 'tlsRpt' | 'dnssec';
+  id: 'mx' | 'ns' | 'mtaSts' | 'tlsRpt' | 'dnssec' | 'm365Tenant';
   title: string;
   status: HealthStatus;
   summary: string;
@@ -219,12 +220,13 @@ export async function runMailInfraChecks(
   mailDomain: string,
 ): Promise<MailInfraCheck[]> {
   const d = mailDomain.toLowerCase();
-  const [mx, ns, mtaSts, tlsRpt, dnssec] = await Promise.all([
+  const [mx, ns, mtaSts, tlsRpt, dnssec, m365Tenant] = await Promise.all([
     checkMx(d),
     checkNs(d),
     checkMtaSts(d),
     checkTlsRpt(d),
     checkDnssec(d),
+    checkM365Tenant(d),
   ]);
-  return [mx, ns, mtaSts, tlsRpt, dnssec];
+  return [mx, ns, mtaSts, tlsRpt, dnssec, m365Tenant];
 }

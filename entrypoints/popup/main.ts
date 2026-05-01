@@ -220,7 +220,7 @@ function renderResult(result: CheckResult): void {
 
       <section class="section-more">
         <h2 class="section-more__title">More DNS checks</h2>
-        <p class="section-more__hint">Same categories as <a href="https://github.com/johnduprey/DNSHealth" target="_blank" rel="noreferrer">DNSHealth</a> (MX, NS, MTA-STS TXT, TLS-RPT, DNSSEC). Lookups use <span class="mono">${escapeHtml(result.dmarcLookupHost)}</span> (organizational domain).</p>
+        <p class="section-more__hint">Same categories as <a href="https://github.com/johnduprey/DNSHealth" target="_blank" rel="noreferrer">DNSHealth</a> (MX, NS, MTA-STS TXT, TLS-RPT, DNSSEC) plus one HTTPS call to Microsoft Entra OpenID Provider Configuration (<span class="mono">login.microsoftonline.com/&lt;domain&gt;/v2.0/.well-known/openid-configuration</span>). DNS lookups use <span class="mono">${escapeHtml(result.dmarcLookupHost)}</span> (organizational domain).</p>
         <div class="cards cards--dense">
           ${result.mailInfra
             .map((c) =>
@@ -242,7 +242,7 @@ function renderResult(result: CheckResult): void {
           <a href="${mxtoolboxEmailHealthUrl(result.dmarcLookupHost)}" target="_blank" rel="noreferrer noopener">MXToolbox Email Health</a>
           for <span class="mono">${escapeHtml(result.dmarcLookupHost)}</span>.
         </p>
-        <p>Uses DNS-over-HTTPS (Cloudflare / Google). Does not fetch MTA-STS policy files or HTTPS certs (those need separate tools). DKIM uses common selectors only.</p>
+        <p>DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only — no MTA-STS policy files or cert inspection. DKIM uses common selectors only.</p>
       </footer>
     </div>
   `;
