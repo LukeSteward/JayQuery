@@ -59,7 +59,7 @@ export function buildMailProviderSpfHint(
   }
 
   if (includes) {
-    lines.push(`SPF references the expected include:${expected}.`);
+    // Summary already states the include; avoid repeating the same line below.
     return {
       providerName,
       status: spfA.multipleRecords ? 'warn' : 'pass',

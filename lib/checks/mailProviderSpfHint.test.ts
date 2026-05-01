@@ -14,6 +14,26 @@ describe('buildMailProviderSpfHint', () => {
     );
     expect(h.status).toBe('pass');
     expect(h.summary).toContain('spf.protection.outlook.com');
+    expect(h.lines).toEqual([]);
+  });
+
+  it('warns without duplicating include detail when multiple SPF TXT exist but expected include is present', () => {
+    const h = buildMailProviderSpfHint(
+      'contoso.com',
+      {
+        dnsState: 'ok',
+        strings: [
+          'v=spf1 include:spf.protection.outlook.com -all',
+          'v=spf1 include:spf.protection.outlook.com ~all',
+        ],
+      },
+      'spf.protection.outlook.com',
+      'Microsoft 365',
+    );
+    expect(h.status).toBe('warn');
+    expect(h.summary).toContain('spf.protection.outlook.com');
+    expect(h.lines.length).toBe(1);
+    expect(h.lines[0]).toMatch(/Several v=spf1/);
   });
 
   it('warns when include is missing', () => {
