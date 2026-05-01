@@ -127,14 +127,21 @@ function renderProtocolCard(
   rawLabel: string,
   rawSnippet: string | null,
   breakdown: GradeLine[],
+  titleInfoTitle?: string,
 ): string {
   const rawBlock = rawSnippet
     ? `<details class="raw"><summary>${rawLabel}</summary><pre class="raw__pre">${escapeHtml(truncate(rawSnippet, 900))}</pre></details>`
     : '';
+  const titleHtml = titleInfoTitle
+    ? `<div class="card__title-group">
+        <h3 class="card__title">${title}</h3>
+        <button type="button" class="card__info" title="${escapeHtml(titleInfoTitle)}" aria-label="${escapeHtml(titleInfoTitle)}">?</button>
+      </div>`
+    : `<h3 class="card__title">${title}</h3>`;
   return `
     <article class="card">
       <div class="card__head">
-        <h3 class="card__title">${title}</h3>
+        ${titleHtml}
         <span class="${badgeClass(score.status)}">${statusLabel(score.status)}</span>
       </div>
       <div class="card__points">${score.points.toFixed(1)} <span class="card__max">/ ${score.max}</span></div>
@@ -173,11 +180,20 @@ function loadingLabel(mode: CheckMode, tab: string): string {
   return `Checking exact hostname ${tab}…`;
 }
 
+function renderHeaderBrand(hostname: string): string {
+  return `
+    <div class="header__brand">
+      <h1 class="header__title">JayQuery</h1>
+      <span class="header__sep" aria-hidden="true">·</span>
+      <span class="header__hostname mono">${escapeHtml(hostname)}</span>
+    </div>
+  `;
+}
+
 function renderLoading(mode: CheckMode): void {
   root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
-        <h1 class="header__title">DNS Health</h1>
-        <p class="header__sub mono">Tab: ${escapeHtml(tabHostname)}</p>
+        ${renderHeaderBrand(tabHostname)}
         ${modeChips(mode)}
         <p class="header__hint">${escapeHtml(loadingLabel(mode, tabHostname))}</p>
       </header>
@@ -194,7 +210,7 @@ function renderError(message: string): void {
   void clearToolbarIconIfPossible();
   root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
-        <h1 class="header__title">DNS Health</h1>
+        ${tabHostname ? renderHeaderBrand(tabHostname) : '<h1 class="header__title header__title--solo">JayQuery</h1>'}
       </header>
       <div class="panel panel--warn">
         <p class="panel__text">${escapeHtml(message)}</p>
@@ -217,7 +233,7 @@ function renderMailInfraCard(
     ? `<ul class="mail-infra-lines">${lines.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
     : '';
   return `
-    <article class="card card--compact">
+    <article class="card">
       <div class="card__head">
         <h3 class="card__title">${title}</h3>
         <span class="${badgeClass(status)}">${statusLabel(status)}</span>
@@ -241,12 +257,9 @@ function renderResult(result: CheckResult): void {
   root.innerHTML = `
     <div class="shell shell--with-fab">
       <header class="header">
-        <h1 class="header__title">DNS Health</h1>
-        <p class="header__sub mono">Tab: ${escapeHtml(result.tabHostname)}</p>
+        ${renderHeaderBrand(result.tabHostname)}
         ${modeChips(result.mode)}
-        <p class="header__host mono">SPF / DKIM: ${escapeHtml(result.queryHostname)}</p>
         ${tabDiffers ? `<p class="header__hint">Root check uses the registrable domain; switch to <strong>Tab hostname</strong> to score <span class="mono">${escapeHtml(result.tabHostname)}</span>.</p>` : ''}
-        <p class="header__hint">${escapeHtml(dmarcHint(result))}</p>
       </header>
 
       <section class="hero">
@@ -268,6 +281,7 @@ function renderResult(result: CheckResult): void {
           'DMARC record',
           result.dmarcRecords[0] ?? null,
           result.dmarcBreakdown,
+          dmarcHint(result),
         )}
         ${renderProtocolCard(
           'DKIM',
@@ -276,25 +290,18 @@ function renderResult(result: CheckResult): void {
           dkimRaw,
           result.dkimBreakdown,
         )}
+        ${result.mailInfra
+          .map((c) =>
+            renderMailInfraCard(
+              c.title,
+              c.status,
+              c.summary,
+              c.lines,
+              c.raw,
+            ),
+          )
+          .join('')}
       </div>
-
-      <section class="section-more">
-        <h2 class="section-more__title">More DNS checks</h2>
-        <p class="section-more__hint">Same categories as <a href="https://github.com/johnduprey/DNSHealth" target="_blank" rel="noreferrer">DNSHealth</a> (MX, NS, MTA-STS TXT, TLS-RPT, DNSSEC) plus one HTTPS call to Microsoft Entra OpenID Provider Configuration (<span class="mono">login.microsoftonline.com/&lt;domain&gt;/v2.0/.well-known/openid-configuration</span>). DNS lookups use <span class="mono">${escapeHtml(result.dmarcLookupHost)}</span> (organizational domain).</p>
-        <div class="cards cards--dense">
-          ${result.mailInfra
-            .map((c) =>
-              renderMailInfraCard(
-                c.title,
-                c.status,
-                c.summary,
-                c.lines,
-                c.raw,
-              ),
-            )
-            .join('')}
-        </div>
-      </section>
 
       <footer class="footer">
         <p>
