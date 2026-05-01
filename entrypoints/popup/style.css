@@ -544,6 +544,52 @@ body {
   margin-bottom: 2px;
 }
 
+.mail-infra-tenant-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #a8afbf;
+}
+
+.mail-infra-tenant-copy__value {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.mail-infra-copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.mail-infra-copy:hover {
+  color: var(--text);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.mail-infra-copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.mail-infra-copy__icon {
+  display: block;
+}
+
 .spf-provider-hint {
   margin-top: 14px;
   padding-top: 12px;

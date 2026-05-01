@@ -114,6 +114,21 @@ describe('checkM365Tenant', () => {
     }
   });
 
+  it('reports warn with Entra messaging for HTTP 400', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 400 })),
+    );
+    try {
+      const r = await checkM365Tenant('consumer-domain.example');
+      expect(r.status).toBe('warn');
+      expect(r.summary).toBe('TenantID not found, domain not on EntraID');
+      expect(r.lines).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reports pass when JSON contains issuer GUID', async () => {
     const body = {
       issuer: 'https://login.microsoftonline.com/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/v2.0',
@@ -129,7 +144,7 @@ describe('checkM365Tenant', () => {
     try {
       const r = await checkM365Tenant('example.com');
       expect(r.status).toBe('pass');
-      expect(r.lines.join('')).toContain('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      expect(r.tenantDirectoryId).toBe('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
       expect(fetch).toHaveBeenCalledWith(
         'https://login.microsoftonline.com/example.com/v2.0/.well-known/openid-configuration',
         expect.any(Object),

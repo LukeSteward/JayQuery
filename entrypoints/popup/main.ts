@@ -32,6 +32,8 @@ let lastResult: CheckResult | null = null;
 
 const COG_SVG = `<svg class="fab__icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.48.5.87.97 1.05V10a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
 
+const COPY_CLIPBOARD_SVG = `<svg class="mail-infra-copy__icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+
 function fabSettingsButton(): string {
   return `
     <button type="button" class="fab" id="btn-open-settings" aria-label="Settings">
@@ -252,13 +254,22 @@ function renderMailInfraCard(
   summary: string,
   lines: string[],
   raw?: string,
+  tenantDirectoryId?: string,
 ): string {
   const rawBlock = raw
     ? `<details class="raw"><summary>Raw</summary><pre class="raw__pre">${escapeHtml(truncate(raw, 900))}</pre></details>`
     : '';
-  const lineBlock = lines.length
-    ? `<ul class="mail-infra-lines">${lines.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+  const tenantRow = tenantDirectoryId
+    ? `<div class="mail-infra-tenant-copy">
+      <span class="mono mail-infra-tenant-copy__value">${escapeHtml(tenantDirectoryId)}</span>
+      <button type="button" class="mail-infra-copy" data-copy="${escapeHtml(tenantDirectoryId)}" aria-label="Copy tenant ID" title="Copy">
+        ${COPY_CLIPBOARD_SVG}
+      </button>
+    </div>`
     : '';
+  const lis = lines.map((t) => `<li>${escapeHtml(t)}</li>`);
+  const lineBlock =
+    lis.length > 0 ? `<ul class="mail-infra-lines">${lis.join('')}</ul>` : '';
   return `
     <article class="card">
       <div class="card__head">
@@ -266,6 +277,7 @@ function renderMailInfraCard(
         <span class="${badgeClass(status)}">${statusLabel(status)}</span>
       </div>
       <p class="card__detail mail-infra-summary">${escapeHtml(summary)}</p>
+      ${tenantRow}
       ${lineBlock}
       ${rawBlock}
     </article>
@@ -329,6 +341,7 @@ function renderResult(result: CheckResult): void {
               c.summary,
               c.lines,
               c.raw,
+              c.tenantDirectoryId,
             ),
           )
           .join('')}
@@ -349,6 +362,7 @@ function renderResult(result: CheckResult): void {
   `;
   bindModeButtons(result.mode, false);
   bindSettingsFab();
+  bindMailInfraCopyButtons();
 }
 
 function renderSettings(): void {
@@ -437,6 +451,16 @@ function renderSettings(): void {
         });
       });
     });
+}
+
+function bindMailInfraCopyButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>('.mail-infra-copy').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.copy;
+      if (text === undefined || text === '') return;
+      void navigator.clipboard.writeText(text).catch(() => {});
+    });
+  });
 }
 
 function bindSettingsFab(): void {

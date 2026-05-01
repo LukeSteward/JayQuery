@@ -7,6 +7,7 @@ export type M365TenantMailInfraCheck = {
   status: HealthStatus;
   summary: string;
   lines: string[];
+  tenantDirectoryId?: string;
   raw?: string;
 };
 
@@ -88,7 +89,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   if (!isValidMailDomainHostname(domainNorm)) {
     return {
       id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
+      title: 'Entra tenant (OIDC Check)',
       status: 'fail',
       summary: 'Invalid hostname',
       lines: ['Mail domain failed hostname validation — cannot query Entra metadata.'],
@@ -105,7 +106,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   } catch {
     return {
       id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
+      title: 'Entra tenant (OIDC Check)',
       status: 'fail',
       summary: 'Request failed',
       lines: ['Could not reach login.microsoftonline.com (network or blocked).'],
@@ -115,7 +116,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   if (response.status === 404) {
     return {
       id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
+      title: 'Entra tenant (OIDC Check)',
       status: 'missing',
       summary: 'No metadata (404)',
       lines: [
@@ -124,10 +125,20 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
     };
   }
 
+  if (response.status === 400) {
+    return {
+      id: 'm365Tenant',
+      title: 'Entra tenant (OIDC Check)',
+      status: 'warn',
+      summary: 'TenantID not found, domain not on EntraID',
+      lines: [],
+    };
+  }
+
   if (!response.ok) {
     return {
       id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
+      title: 'Entra tenant (OIDC Check)',
       status: response.status >= 500 ? 'fail' : 'warn',
       summary: `HTTP ${response.status}`,
       lines: [
@@ -142,7 +153,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   } catch {
     return {
       id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
+      title: 'Entra tenant (OIDC Check)',
       status: 'warn',
       summary: 'Not JSON',
       lines: ['Response was not JSON — cannot parse issuer or endpoints.'],
@@ -153,7 +164,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   if (!doc) {
     return {
       id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
+      title: 'Entra tenant (OIDC Check)',
       status: 'warn',
       summary: 'Invalid payload',
       lines: ['OIDC document was not an object.'],
@@ -161,6 +172,17 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   }
 
   const tenantId = tenantDirectoryIdFromDiscoveryDoc(doc);
+
+  if (tenantId) {
+    return {
+      id: 'm365Tenant',
+      title: 'Entra tenant (OIDC Check)',
+      status: 'pass',
+      summary: 'Tenant ID resolved',
+      lines: [],
+      tenantDirectoryId: tenantId,
+    };
+  }
 
   const issuerStr = typeof doc.issuer === 'string' ? doc.issuer : '(missing)';
   const authEp =
@@ -171,23 +193,9 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
     .filter(Boolean)
     .join('\n');
 
-  if (tenantId) {
-    return {
-      id: 'm365Tenant',
-      title: 'Entra tenant (OIDC)',
-      status: 'pass',
-      summary: 'Tenant ID resolved',
-      lines: [
-        'OpenID Provider Configuration fetched from Entra.',
-        `Tenant directory ID ${tenantId}`,
-      ],
-      raw: rawBlock,
-    };
-  }
-
   return {
     id: 'm365Tenant',
-    title: 'Entra tenant (OIDC)',
+    title: 'Entra tenant (OIDC Check)',
     status: 'missing',
     summary: 'No GUID in issuer',
     lines: [

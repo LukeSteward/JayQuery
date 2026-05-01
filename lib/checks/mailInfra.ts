@@ -19,6 +19,8 @@ export type MailInfraCheck = {
   status: HealthStatus;
   summary: string;
   lines: string[];
+  /** Entra OIDC pass — rendered as TenantID + copy control in the popup. */
+  tenantDirectoryId?: string;
   raw?: string;
   /**
    * When MX matched a known profile — used only to build the informational SPF supplement
