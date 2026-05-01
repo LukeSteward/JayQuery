@@ -201,6 +201,21 @@ export function computeFullScore(
   return { overall, spf, dmarc, dkim };
 }
 
+/** Hard fail when TXT resolution was non-definitive (SERVFAIL, fetch errors, etc.). */
+export function scoreDnsResolutionFailure(
+  protocol: 'spf' | 'dmarc' | 'dkim',
+  detail: string,
+): ProtocolScore {
+  const max =
+    protocol === 'spf' ? SPF_MAX : protocol === 'dmarc' ? DMARC_MAX : DKIM_MAX;
+  return {
+    points: 0,
+    max,
+    status: 'fail',
+    detail,
+  };
+}
+
 export type { GradeLine } from './breakdown';
 export {
   buildDkimBreakdown,

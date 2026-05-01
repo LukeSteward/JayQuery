@@ -1,6 +1,7 @@
 import { getDomain } from 'tldts';
 import { runMailInfraChecks, type MailInfraCheck } from '@/lib/checks/mailInfra';
-import { resolveTxt } from '@/lib/dns/queryTxt';
+import { resolveTxtDetailed } from '@/lib/dns/queryTxt';
+import type { TxtRecordsDetailed } from '@/lib/dns/dohJson';
 import { analyzeSpf } from '@/lib/parse/spf';
 import { analyzeDmarc } from '@/lib/parse/dmarc';
 import {
@@ -16,11 +17,17 @@ import {
   scoreDmarc,
   scoreDkim,
   scoreSpf,
+  scoreDnsResolutionFailure,
   type FullScore,
   type GradeLine,
 } from '@/lib/score';
 
 export type CheckMode = 'apex' | 'exact';
+
+export type DnsCheckOptions = {
+  /** When true, SERVFAIL / fetch failure count as fail for SPF/DMARC/DKIM. Default true. */
+  treatDnsResolutionErrorsAsFailure?: boolean;
+};
 
 export type CheckResult = {
   tabHostname: string;
@@ -36,6 +43,8 @@ export type CheckResult = {
   dkimBreakdown: GradeLine[];
   /** MX, NS, MTA-STS TXT, TLS-RPT, DNSSEC — organizational domain (DNSHealth-style). */
   mailInfra: MailInfraCheck[];
+  /** True when that pillar hit non-definitive DNS and strict mode applied. */
+  emailAuthDnsError: { spf: boolean; dmarc: boolean; dkim: boolean };
 };
 
 function mergeTxtForDkim(chunks: string[]): string | null {
@@ -43,6 +52,28 @@ function mergeTxtForDkim(chunks: string[]): string | null {
   if (chunks.length === 1) return chunks[0];
   return chunks.join('');
 }
+
+const DNS_FAIL_SPF: GradeLine[] = [
+  {
+    status: 'fail',
+    text: 'Could not resolve SPF TXT (DNS error or non-definitive response).',
+  },
+];
+
+const DNS_FAIL_DMARC = (org: string): GradeLine[] => [
+  {
+    status: 'fail',
+    text: `Could not resolve DMARC TXT at _dmarc.${org} (DNS error or non-definitive response).`,
+  },
+];
+
+const DNS_FAIL_DKIM: GradeLine[] = [
+  {
+    status: 'fail',
+    text:
+      'Could not resolve DKIM TXT at any probed selector (DNS error or non-definitive response).',
+  },
+];
 
 /** SPF/DKIM query target + DMARC organizational domain (from tab host). */
 export function resolveCheckTargets(
@@ -55,27 +86,52 @@ export function resolveCheckTargets(
   return { tab, orgDomain, queryHost };
 }
 
+function analysisStrings(
+  detailed: TxtRecordsDetailed,
+  treatDnsAsFail: boolean,
+): string[] {
+  if (detailed.dnsState === 'error' && treatDnsAsFail) {
+    return [];
+  }
+  return detailed.strings;
+}
+
 export async function runDnsCheck(
   tabHostname: string,
   mode: CheckMode = 'apex',
+  options?: DnsCheckOptions,
 ): Promise<CheckResult> {
+  const treatDnsAsFail = options?.treatDnsResolutionErrorsAsFailure ?? true;
   const { tab, orgDomain, queryHost } = resolveCheckTargets(tabHostname, mode);
   const dmarcFqdn = `_dmarc.${orgDomain}`;
 
-  const [spfTxts, dmarcTxts, mailInfra] = await Promise.all([
-    resolveTxt(queryHost),
-    resolveTxt(dmarcFqdn),
+  const [spfDetailed, dmarcDetailed, mailInfra] = await Promise.all([
+    resolveTxtDetailed(queryHost),
+    resolveTxtDetailed(dmarcFqdn),
     runMailInfraChecks(orgDomain),
   ]);
+
+  const spfTxts = analysisStrings(spfDetailed, treatDnsAsFail);
+  const dmarcTxts = analysisStrings(dmarcDetailed, treatDnsAsFail);
+
+  const spfDnsErr =
+    treatDnsAsFail && spfDetailed.dnsState === 'error';
+  const dmarcDnsErr =
+    treatDnsAsFail && dmarcDetailed.dnsState === 'error';
 
   const spfA = analyzeSpf(spfTxts);
   const dmarcA = analyzeDmarc(dmarcTxts);
 
   let dkimBest: (DkimRecordAnalysis & { selector: string }) | null = null;
+  let hadDefinitiveDkimLookup = false;
 
   for (const sel of getDkimSelectors()) {
     const name = `${sel}._domainkey.${queryHost}`;
-    const txts = await resolveTxt(name);
+    const det = await resolveTxtDetailed(name);
+    if (det.dnsState === 'ok' || det.dnsState === 'nxdomain') {
+      hadDefinitiveDkimLookup = true;
+    }
+    const txts = analysisStrings(det, treatDnsAsFail);
     const merged = mergeTxtForDkim(txts);
     const rec = analyzeDkimRecord(merged);
     const tagged: DkimRecordAnalysis & { selector: string } = {
@@ -102,9 +158,37 @@ export async function runDnsCheck(
     };
   }
 
-  const spfScore = scoreSpf(spfA);
-  const dmarcScore = scoreDmarc(dmarcA, orgDomain);
-  const dkimScore = scoreDkim(dkimBest);
+  const dkimDnsErr = treatDnsAsFail && !hadDefinitiveDkimLookup;
+
+  let spfScore = scoreSpf(spfA);
+  let dmarcScore = scoreDmarc(dmarcA, orgDomain);
+  let dkimScore = scoreDkim(dkimBest);
+
+  let spfBreakdown = buildSpfBreakdown(spfA);
+  let dmarcBreakdown = buildDmarcBreakdown(dmarcA, orgDomain);
+  let dkimBreakdown = buildDkimBreakdown(dkimBest);
+
+  if (spfDnsErr) {
+    spfScore = scoreDnsResolutionFailure(
+      'spf',
+      'Could not resolve SPF TXT (DNS error or non-definitive response).',
+    );
+    spfBreakdown = DNS_FAIL_SPF;
+  }
+  if (dmarcDnsErr) {
+    dmarcScore = scoreDnsResolutionFailure(
+      'dmarc',
+      `Could not resolve DMARC TXT at _dmarc.${orgDomain} (DNS error or non-definitive response).`,
+    );
+    dmarcBreakdown = DNS_FAIL_DMARC(orgDomain);
+  }
+  if (dkimDnsErr) {
+    dkimScore = scoreDnsResolutionFailure(
+      'dkim',
+      'Could not resolve DKIM TXT at any probed selector (DNS error or non-definitive response).',
+    );
+    dkimBreakdown = DNS_FAIL_DKIM;
+  }
 
   return {
     tabHostname: tab,
@@ -115,9 +199,14 @@ export async function runDnsCheck(
     spfRecords: spfA.rawRecords,
     dmarcRecords: dmarcA.rawRecords,
     dkim: dkimBest,
-    spfBreakdown: buildSpfBreakdown(spfA),
-    dmarcBreakdown: buildDmarcBreakdown(dmarcA, orgDomain),
-    dkimBreakdown: buildDkimBreakdown(dkimBest),
+    spfBreakdown,
+    dmarcBreakdown,
+    dkimBreakdown,
     mailInfra,
+    emailAuthDnsError: {
+      spf: spfDnsErr,
+      dmarc: dmarcDnsErr,
+      dkim: dkimDnsErr,
+    },
   };
 }

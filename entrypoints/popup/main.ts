@@ -1,13 +1,75 @@
 import './style.css';
-import { runDnsCheck, type CheckMode, type CheckResult } from '@/lib/checkDomain';
+import {
+  runDnsCheck,
+  type CheckMode,
+  type CheckResult,
+} from '@/lib/checkDomain';
 import { getActiveTabHostname } from '@/lib/tabHost';
 import type { FullScore, GradeLine, HealthStatus } from '@/lib/score';
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+  type ExtensionSettings,
+  type ToolbarIconDriver,
+} from '@/lib/settings';
+import {
+  applyToolbarIconForTab,
+  resetToolbarIconForTab,
+} from '@/lib/toolbarIcon';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app missing');
 const root = app;
 
 let tabHostname = '';
+let activeTabId: number | null = null;
+let settings: ExtensionSettings = { ...DEFAULT_SETTINGS };
+let currentView: 'main' | 'settings' = 'main';
+let lastMode: CheckMode = 'apex';
+let lastResult: CheckResult | null = null;
+
+const COG_SVG = `<svg class="fab__icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.48.5.87.97 1.05V10a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
+
+function fabSettingsButton(): string {
+  return `
+    <button type="button" class="fab" id="btn-open-settings" aria-label="Settings">
+      ${COG_SVG}
+    </button>
+  `;
+}
+
+/** Loading / error: footer with settings only (matches results footer placement pattern). */
+function shellWithFabFooterOnly(bodyHtml: string): string {
+  return `
+    <div class="shell shell--with-fab">
+      ${bodyHtml}
+      <footer class="footer footer--fab-only">
+        <div class="fab-row fab-row--footer">
+          ${fabSettingsButton()}
+        </div>
+      </footer>
+    </div>
+  `;
+}
+
+async function syncToolbarIconFromResult(result: CheckResult): Promise<void> {
+  if (activeTabId == null) return;
+  if (settings.coloredToolbarIcon) {
+    await applyToolbarIconForTab(
+      activeTabId,
+      result.full,
+      settings.toolbarIconDriver,
+    );
+  } else {
+    await resetToolbarIconForTab(activeTabId);
+  }
+}
+
+async function clearToolbarIconIfPossible(): Promise<void> {
+  if (activeTabId == null) return;
+  await resetToolbarIconForTab(activeTabId);
+}
 
 function badgeClass(status: HealthStatus): string {
   return `badge badge--${status}`;
@@ -112,8 +174,7 @@ function loadingLabel(mode: CheckMode, tab: string): string {
 }
 
 function renderLoading(mode: CheckMode): void {
-  root.innerHTML = `
-    <div class="shell">
+  root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
         <h1 class="header__title">DNS Health</h1>
         <p class="header__sub mono">Tab: ${escapeHtml(tabHostname)}</p>
@@ -124,22 +185,22 @@ function renderLoading(mode: CheckMode): void {
         <div class="loading__pulse"></div>
         <p>Querying public DNS (DoH)…</p>
       </div>
-    </div>
-  `;
+  `);
   bindModeButtons(mode, true);
+  bindSettingsFab();
 }
 
 function renderError(message: string): void {
-  root.innerHTML = `
-    <div class="shell">
+  void clearToolbarIconIfPossible();
+  root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
         <h1 class="header__title">DNS Health</h1>
       </header>
       <div class="panel panel--warn">
         <p class="panel__text">${escapeHtml(message)}</p>
       </div>
-    </div>
-  `;
+  `);
+  bindSettingsFab();
 }
 
 function renderMailInfraCard(
@@ -175,11 +236,10 @@ function dmarcHint(result: CheckResult): string {
 function renderResult(result: CheckResult): void {
   const { full } = result;
   const dkimRaw = result.dkim.raw;
-  const tabDiffers =
-    result.tabHostname !== result.queryHostname;
+  const tabDiffers = result.tabHostname !== result.queryHostname;
 
   root.innerHTML = `
-    <div class="shell">
+    <div class="shell shell--with-fab">
       <header class="header">
         <h1 class="header__title">DNS Health</h1>
         <p class="header__sub mono">Tab: ${escapeHtml(result.tabHostname)}</p>
@@ -243,10 +303,131 @@ function renderResult(result: CheckResult): void {
           for <span class="mono">${escapeHtml(result.dmarcLookupHost)}</span>.
         </p>
         <p>DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only — no MTA-STS policy files or cert inspection. DKIM uses common selectors only.</p>
+        <div class="fab-row fab-row--footer">
+          ${fabSettingsButton()}
+        </div>
       </footer>
     </div>
   `;
   bindModeButtons(result.mode, false);
+  bindSettingsFab();
+}
+
+function renderSettings(): void {
+  root.innerHTML = `
+    <div class="shell shell--settings">
+      <header class="settings-header">
+        <button type="button" class="settings-back" id="btn-settings-back" aria-label="Back to results">
+          ← Back
+        </button>
+        <h1 class="settings-header__title">Settings</h1>
+      </header>
+      <div class="settings-body">
+        <label class="settings-row">
+          <span class="settings-row__text">
+            <strong>Colored toolbar icon</strong>
+            <span class="settings-row__hint">Good (check) / bad (X) glyphs from SPF, DMARC, and DKIM. Turn off to use a neutral gray icon.</span>
+          </span>
+          <input type="checkbox" id="setting-colored-icon" ${settings.coloredToolbarIcon ? 'checked' : ''} />
+        </label>
+        <fieldset class="settings-fieldset">
+          <legend class="settings-fieldset__legend">Toolbar icon driver</legend>
+          <p class="settings-fieldset__hint">Choose which result turns the icon red/green, or keep the default three-column view.</p>
+          <label class="settings-radio">
+            <input type="radio" name="toolbar-icon-driver" value="combined" ${settings.toolbarIconDriver === 'combined' ? 'checked' : ''} />
+            <span><strong>Combined</strong> — SPF, DMARC, and DKIM (one glyph each)</span>
+          </label>
+          <label class="settings-radio">
+            <input type="radio" name="toolbar-icon-driver" value="spf" ${settings.toolbarIconDriver === 'spf' ? 'checked' : ''} />
+            <span><strong>SPF only</strong></span>
+          </label>
+          <label class="settings-radio">
+            <input type="radio" name="toolbar-icon-driver" value="dmarc" ${settings.toolbarIconDriver === 'dmarc' ? 'checked' : ''} />
+            <span><strong>DMARC only</strong></span>
+          </label>
+          <label class="settings-radio">
+            <input type="radio" name="toolbar-icon-driver" value="dkim" ${settings.toolbarIconDriver === 'dkim' ? 'checked' : ''} />
+            <span><strong>DKIM only</strong></span>
+          </label>
+        </fieldset>
+        <label class="settings-row">
+          <span class="settings-row__text">
+            <strong>Treat DNS resolution errors as failure</strong>
+            <span class="settings-row__hint">When off, SERVFAIL and lookup errors are treated like empty TXT (older behavior).</span>
+          </span>
+          <input type="checkbox" id="setting-dns-errors-fail" ${settings.treatDnsResolutionErrorsAsFailure ? 'checked' : ''} />
+        </label>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btn-settings-back')?.addEventListener('click', () => {
+    currentView = 'main';
+    if (lastResult) {
+      renderResult(lastResult);
+      void syncToolbarIconFromResult(lastResult);
+    } else {
+      void runCheck(lastMode);
+    }
+  });
+
+  const colored = document.getElementById(
+    'setting-colored-icon',
+  ) as HTMLInputElement | null;
+  colored?.addEventListener('change', () => {
+    void persistSettingsAndRefresh({
+      coloredToolbarIcon: colored.checked,
+    });
+  });
+
+  const dnsFail = document.getElementById(
+    'setting-dns-errors-fail',
+  ) as HTMLInputElement | null;
+  dnsFail?.addEventListener('change', () => {
+    void persistSettingsAndRefresh({
+      treatDnsResolutionErrorsAsFailure: dnsFail.checked,
+    });
+  });
+
+  document
+    .querySelectorAll<HTMLInputElement>('input[name="toolbar-icon-driver"]')
+    .forEach((el) => {
+      el.addEventListener('change', () => {
+        if (!el.checked) return;
+        void persistSettingsAndRefresh({
+          toolbarIconDriver: el.value as ToolbarIconDriver,
+        });
+      });
+    });
+}
+
+function bindSettingsFab(): void {
+  document.getElementById('btn-open-settings')?.addEventListener('click', () => {
+    currentView = 'settings';
+    renderSettings();
+  });
+}
+
+async function persistSettingsAndRefresh(
+  partial: Partial<ExtensionSettings>,
+): Promise<void> {
+  settings = { ...settings, ...partial };
+  await saveSettings(settings);
+  if (!tabHostname) return;
+  if (currentView === 'settings') {
+    try {
+      const result = await runDnsCheck(tabHostname, lastMode, {
+        treatDnsResolutionErrorsAsFailure:
+          settings.treatDnsResolutionErrorsAsFailure,
+      });
+      lastResult = result;
+      await syncToolbarIconFromResult(result);
+    } catch {
+      /* keep prior lastResult */
+    }
+    return;
+  }
+  await runCheck(lastMode);
 }
 
 function bindModeButtons(mode: CheckMode, loading: boolean): void {
@@ -266,9 +447,18 @@ function bindModeButtons(mode: CheckMode, loading: boolean): void {
 }
 
 async function runCheck(mode: CheckMode): Promise<void> {
+  lastMode = mode;
   renderLoading(mode);
   try {
-    const result = await runDnsCheck(tabHostname, mode);
+    const result = await runDnsCheck(tabHostname, mode, {
+      treatDnsResolutionErrorsAsFailure:
+        settings.treatDnsResolutionErrorsAsFailure,
+    });
+    lastResult = result;
+    await syncToolbarIconFromResult(result);
+    if (currentView === 'settings') {
+      return;
+    }
     renderResult(result);
   } catch (e) {
     const msg =
@@ -278,12 +468,17 @@ async function runCheck(mode: CheckMode): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  settings = await loadSettings();
   const tab = await getActiveTabHostname();
   if (!tab.ok) {
+    activeTabId = null;
     renderError(tab.reason);
     return;
   }
   tabHostname = tab.host;
+  activeTabId = tab.tabId;
+  currentView = 'main';
+  lastResult = null;
   await runCheck('apex');
 }
 

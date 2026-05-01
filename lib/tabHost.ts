@@ -15,13 +15,17 @@ function isUnsupportedUrlProtocol(url: string): boolean {
 }
 
 export type TabHostResult =
-  | { ok: true; host: string }
+  | { ok: true; host: string; tabId: number }
   | { ok: false; reason: string };
 
 export async function getActiveTabHostname(): Promise<TabHostResult> {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
+  const tabId = tab?.id;
   const url = tab?.url;
+  if (tabId == null) {
+    return { ok: false, reason: 'No active tab ID available.' };
+  }
   if (!url) {
     return { ok: false, reason: 'No URL available for the active tab.' };
   }
@@ -49,5 +53,5 @@ export async function getActiveTabHostname(): Promise<TabHostResult> {
     return { ok: false, reason: 'IPv6 literal hosts are not supported.' };
   }
 
-  return { ok: true, host };
+  return { ok: true, host, tabId };
 }

@@ -5,6 +5,7 @@ import {
   computeFullScore,
   scoreDkim,
   scoreDmarc,
+  scoreDnsResolutionFailure,
   scoreSpf,
 } from '@/lib/score';
 
@@ -43,5 +44,15 @@ describe('scoring', () => {
     });
     const full = computeFullScore(spf, dmarc, dkim);
     expect(full.overall).toBe(0);
+  });
+});
+
+describe('scoreDnsResolutionFailure', () => {
+  it('returns fail with zero points for SPF', () => {
+    const s = scoreDnsResolutionFailure('spf', 'DNS busted');
+    expect(s.status).toBe('fail');
+    expect(s.points).toBe(0);
+    expect(s.max).toBe(3);
+    expect(s.detail).toBe('DNS busted');
   });
 });

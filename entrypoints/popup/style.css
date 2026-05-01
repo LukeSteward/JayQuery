@@ -30,19 +30,218 @@
   box-sizing: border-box;
 }
 
+/*
+ * One scroll container only: <html>. Do not add overflow-y on #app or body —
+ * Chrome’s action popup + nested overflow produced two scrollbars.
+ */
+html {
+  margin: 0;
+  padding: 0;
+  max-height: 680px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   margin: 0;
+  padding: 0;
   min-width: 380px;
   max-width: 420px;
+  overflow: visible;
   background: var(--bg);
 }
 
 #app {
-  min-height: 100%;
+  display: block;
+  overflow: visible;
 }
 
 .shell {
   padding: 16px 16px 20px;
+}
+
+.shell--with-fab {
+  padding-bottom: 16px;
+}
+
+.fab-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fab-row--footer {
+  margin-top: 12px;
+}
+
+.footer--fab-only {
+  margin-top: 8px;
+}
+
+.footer--fab-only .fab-row--footer {
+  margin-top: 0;
+}
+
+.fab {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.fab:hover {
+  color: var(--text);
+  border-color: rgba(91, 140, 255, 0.45);
+  background: var(--surface);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.fab__icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.shell--settings {
+  padding: 16px 16px 24px;
+}
+
+.settings-header {
+  margin-bottom: 8px;
+}
+
+.settings-header__title {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.settings-back {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.settings-back:hover {
+  text-decoration: underline;
+}
+
+.settings-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.settings-row__text strong {
+  font-weight: 600;
+}
+
+.settings-row__hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.settings-row input[type='checkbox'] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.settings-fieldset {
+  margin: 0 0 8px;
+  padding: 12px 0 4px;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-fieldset__legend {
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-fieldset__hint {
+  margin: 6px 0 10px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.settings-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settings-radio input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.settings-radio span {
+  line-height: 1.35;
 }
 
 .header__title {

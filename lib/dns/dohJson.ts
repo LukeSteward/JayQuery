@@ -21,6 +21,13 @@ export type DohResult = {
   answers: DohAnswer[];
 };
 
+/** Set when both DoH providers fail the HTTP request. */
+export const FETCH_FAILED_STATUS = -1;
+
+export type ResolveDnsOutcome = DohResult & {
+  fetchFailed: boolean;
+};
+
 /** https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-6 */
 export const DNS_TYPE = {
   A: 1,
@@ -70,14 +77,11 @@ async function fetchDoh(url: string): Promise<DohResult> {
   };
 }
 
-/**
- * Query public DoH — try Cloudflare then Google on failure or empty NOERROR.
- */
-export async function resolveDns(
+async function resolveDnsOutcome(
   name: string,
   type: number,
   options?: { dnssec?: boolean; fallbackWhenEmpty?: boolean },
-): Promise<DohResult> {
+): Promise<ResolveDnsOutcome> {
   const dnssec = options?.dnssec ?? false;
   const fallbackWhenEmpty = options?.fallbackWhenEmpty ?? true;
 
@@ -89,24 +93,72 @@ export async function resolveDns(
       cf.answers.length > 0 ||
       cf.status !== RCODE.NOERROR
     ) {
-      return cf;
+      return { ...cf, fetchFailed: false };
     }
   } catch {
     // fall through
   }
   const gUrl = buildUrl(GOOGLE_BASE, name, type, dnssec);
-  return fetchDoh(gUrl);
+  try {
+    const google = await fetchDoh(gUrl);
+    return { ...google, fetchFailed: false };
+  } catch {
+    return {
+      status: FETCH_FAILED_STATUS,
+      ad: false,
+      answers: [],
+      fetchFailed: true,
+    };
+  }
 }
 
-/** TXT record strings for `name`. */
-export async function resolveTxtRecords(name: string): Promise<string[]> {
-  const r = await resolveDns(name, DNS_TYPE.TXT, { dnssec: false });
-  if (r.status !== RCODE.NOERROR) {
-    return [];
+/**
+ * Query public DoH — try Cloudflare then Google on failure or empty NOERROR.
+ * Throws if both providers fail the HTTP request (legacy behaviour for MX/NS).
+ */
+export async function resolveDns(
+  name: string,
+  type: number,
+  options?: { dnssec?: boolean; fallbackWhenEmpty?: boolean },
+): Promise<DohResult> {
+  const o = await resolveDnsOutcome(name, type, options);
+  if (o.fetchFailed) {
+    throw new Error('DoH unavailable');
+  }
+  return { status: o.status, ad: o.ad, answers: o.answers };
+}
+
+export type TxtDnsState = 'ok' | 'nxdomain' | 'error';
+
+export type TxtRecordsDetailed = {
+  strings: string[];
+  dnsState: TxtDnsState;
+};
+
+function classifyTxtDnsState(o: ResolveDnsOutcome): TxtDnsState {
+  if (o.fetchFailed) return 'error';
+  if (o.status === RCODE.NXDOMAIN) return 'nxdomain';
+  if (o.status === RCODE.NOERROR) return 'ok';
+  return 'error';
+}
+
+/**
+ * TXT strings plus whether the lookup was definitive (NOERROR / NXDOMAIN) vs error.
+ */
+export async function resolveTxtRecordsDetailed(
+  name: string,
+): Promise<TxtRecordsDetailed> {
+  const o = await resolveDnsOutcome(name, DNS_TYPE.TXT, {
+    dnssec: false,
+    fallbackWhenEmpty: true,
+  });
+  const dnsState = classifyTxtDnsState(o);
+  if (dnsState !== 'ok') {
+    return { strings: [], dnsState };
   }
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const a of r.answers) {
+  for (const a of o.answers) {
     if (a.type !== DNS_TYPE.TXT || a.data == null) continue;
     const s = decodeTxtRdata(a.data);
     if (!seen.has(s)) {
@@ -114,7 +166,13 @@ export async function resolveTxtRecords(name: string): Promise<string[]> {
       out.push(s);
     }
   }
-  return out;
+  return { strings: out, dnsState: 'ok' };
+}
+
+/** TXT record strings for `name` (legacy helper for mail-infra and simple callers). */
+export async function resolveTxtRecords(name: string): Promise<string[]> {
+  const d = await resolveTxtRecordsDetailed(name);
+  return d.strings;
 }
 
 export type MxRecord = { priority: number; exchange: string };
