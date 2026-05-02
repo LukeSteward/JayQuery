@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a new capability or improvement
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: Describe the outcome you want. Clear use cases help decide scope and priority.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What is hard, missing, or confusing today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine this working (behavior, UX, APIs), even at a high level.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (optional)
+      description: Other approaches you've thought about.
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional context (optional)
+      description: Mockups, links, specs, edge cases.

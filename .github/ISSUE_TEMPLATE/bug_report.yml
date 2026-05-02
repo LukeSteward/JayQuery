@@ -1,0 +1,54 @@
+name: Bug report
+description: Report something that is broken or incorrect
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for filing a bug. The more detail you add, the faster we can reproduce and fix it.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps someone else can follow. Include URLs if the issue depends on a specific site.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, extension version/build, OS (approximate is fine).
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / logs (optional)
+      description: Screenshots or console/extension errors if helpful.
