@@ -1,8 +1,12 @@
 import type { FullScore } from '@/lib/score';
 import type { HealthStatus } from '@/lib/score/common';
 import type { ToolbarIconDriver } from '@/lib/settings';
+import {
+  rasterNeutralToolbarToImageData,
+  rasterToolbarScoreToImageData,
+} from '@/lib/toolbarIconCanvasRaster';
 
-/** Good = check in circle; bad = X in circle (stroke-only, works when rasterized small). */
+/** Good = check in circle; bad = X in circle (stroke-only; used for SVG test strings). */
 function svgGlyphGood(
   cx: number,
   cy: number,
@@ -30,10 +34,7 @@ function svgGlyphBad(
   <path d="M ${cx - d} ${cy - d} L ${cx + d} ${cy + d} M ${cx + d} ${cy - d} L ${cx - d} ${cy + d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" />`;
 }
 
-/** Nearly fills the 24×24 toolbar asset (stroke-only; no filled backdrop). */
 const SINGLE_GLYPH_RADIUS = 9.35;
-
-/** Max circle in each 8-unit-wide column (centers at 4, 12, 20). */
 const COMBINED_COLUMN_RADIUS = 3.72;
 
 /** Pass → green good; warn → amber good (same glyph); fail/missing → red bad. */
@@ -86,46 +87,34 @@ export function toolbarIconSvgForScore(
   return buildSingleToolbarSvg(full, driver);
 }
 
-async function rasterizeSvgToImageData(
-  svg: string,
-  size: number,
-): Promise<ImageData> {
-  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('SVG rasterize failed'));
-      img.src = url;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
-      throw new Error('Canvas 2D context unavailable');
-    }
-    ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(img, 0, 0, size, size);
-    return ctx.getImageData(0, 0, size, size);
-  } finally {
-    URL.revokeObjectURL(url);
+function getPackagedIconPaths(): Record<'16' | '32', string> {
+  const g = globalThis as typeof globalThis & {
+    browser?: { runtime?: { getURL?: (path: string) => string } };
+  };
+  const getURL = g.browser?.runtime?.getURL;
+  if (typeof getURL === 'function') {
+    const bound = getURL.bind(g.browser!.runtime) as (path: string) => string;
+    return {
+      '16': bound('icon/16.png'),
+      '32': bound('icon/32.png'),
+    };
   }
+  return { '16': 'icon/16.png', '32': 'icon/32.png' };
 }
 
-/** Neutral: transparent background, gray ring only (matches stroke-only toolbar style). */
-const NEUTRAL_TOOLBAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2" fill="none" stroke="#6b7280" stroke-width="1.35"/></svg>`;
+async function applyPackagedFallbackIcon(tabId: number): Promise<void> {
+  await browser.action.setIcon({
+    tabId,
+    path: getPackagedIconPaths(),
+  });
+}
 
 export async function toolbarIconImageDataForScore(
   full: FullScore,
   driver: ToolbarIconDriver,
 ): Promise<{ '16': ImageData; '32': ImageData }> {
-  const svg = toolbarIconSvgForScore(full, driver);
-  const [i16, i32] = await Promise.all([
-    rasterizeSvgToImageData(svg, 16),
-    rasterizeSvgToImageData(svg, 32),
-  ]);
+  const i16 = rasterToolbarScoreToImageData(full, driver, 16);
+  const i32 = rasterToolbarScoreToImageData(full, driver, 32);
   return { '16': i16, '32': i32 };
 }
 
@@ -133,11 +122,10 @@ export async function toolbarIconNeutralImageData(): Promise<{
   '16': ImageData;
   '32': ImageData;
 }> {
-  const [i16, i32] = await Promise.all([
-    rasterizeSvgToImageData(NEUTRAL_TOOLBAR_SVG, 16),
-    rasterizeSvgToImageData(NEUTRAL_TOOLBAR_SVG, 32),
-  ]);
-  return { '16': i16, '32': i32 };
+  return {
+    '16': rasterNeutralToolbarToImageData(16),
+    '32': rasterNeutralToolbarToImageData(32),
+  };
 }
 
 export async function applyToolbarIconForTab(
@@ -145,11 +133,27 @@ export async function applyToolbarIconForTab(
   full: FullScore,
   driver: ToolbarIconDriver,
 ): Promise<void> {
-  const imageData = await toolbarIconImageDataForScore(full, driver);
-  await browser.action.setIcon({ tabId, imageData });
+  try {
+    const imageData = await toolbarIconImageDataForScore(full, driver);
+
+    /** Chrome validates imageData dictionary keys strictly in some builds. */
+    await browser.action.setIcon({
+      tabId,
+      imageData: { 16: imageData['16'], 32: imageData['32'] },
+    });
+  } catch {
+    await applyPackagedFallbackIcon(tabId);
+  }
 }
 
 export async function resetToolbarIconForTab(tabId: number): Promise<void> {
-  const imageData = await toolbarIconNeutralImageData();
-  await browser.action.setIcon({ tabId, imageData });
+  try {
+    const imageData = await toolbarIconNeutralImageData();
+    await browser.action.setIcon({
+      tabId,
+      imageData: { 16: imageData['16'], 32: imageData['32'] },
+    });
+  } catch {
+    await applyPackagedFallbackIcon(tabId);
+  }
 }
