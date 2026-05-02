@@ -1,5 +1,6 @@
 import './style.css';
 import {
+  resolveCheckTargets,
   runDnsCheck,
   type CheckMode,
   type CheckResult,
@@ -378,9 +379,12 @@ function renderHeaderBrand(hostname: string): string {
 }
 
 function renderLoading(mode: CheckMode): void {
+  const headerHost = tabHostname
+    ? resolveCheckTargets(tabHostname, mode).queryHost
+    : '';
   root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
-        ${renderHeaderBrand(tabHostname)}
+        ${headerHost ? renderHeaderBrand(headerHost) : '<h1 class="header__title header__title--solo">JayQuery</h1>'}
         ${modeChips(mode)}
         <p class="header__hint">${escapeHtml(loadingLabel(mode, tabHostname))}</p>
       </header>
@@ -468,7 +472,7 @@ function renderResult(result: CheckResult): void {
   root.innerHTML = `
     <div class="shell shell--with-fab">
       <header class="header">
-        ${renderHeaderBrand(result.tabHostname)}
+        ${renderHeaderBrand(result.queryHostname)}
         ${modeChips(result.mode)}
         ${tabDiffers ? `<p class="header__hint">Root check uses the registrable domain; switch to <strong>Tab hostname</strong> to score <span class="mono">${escapeHtml(result.tabHostname)}</span>.</p>` : ''}
       </header>
