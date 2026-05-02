@@ -1,5 +1,9 @@
 import type { HealthStatus } from '@/lib/score/common';
 
+/** Shown when no STS TXT — also filtered from bullets when Detailed breakdown is off. */
+export const MTA_STS_ABSENT_DETAIL_TEXT =
+  'No MTA-STS TXT (v=STSv1) at _mta-sts.';
+
 export type MtaStsTxtAnalysis = {
   record: string | null;
   recordCount: number;
@@ -24,7 +28,7 @@ export function analyzeMtaStsTxt(txtRecords: string[]): MtaStsTxtAnalysis {
   if (recordCount === 0) {
     lines.push({
       status: 'fail',
-      text: 'No MTA-STS TXT (v=STSv1) at _mta-sts.',
+      text: MTA_STS_ABSENT_DETAIL_TEXT,
     });
     return {
       record: null,

@@ -1,5 +1,9 @@
 import type { HealthStatus } from '@/lib/score/common';
 
+/** Shown when no TLS-RPT TXT — also filtered from bullets when Detailed breakdown is off. */
+export const TLS_RPT_ABSENT_DETAIL_TEXT =
+  'No TLS-RPT TXT (v=TLSRPTv1) at _smtp._tls.';
+
 export type TlsRptTxtAnalysis = {
   record: string | null;
   recordCount: number;
@@ -27,7 +31,7 @@ export function analyzeTlsRptTxt(txtRecords: string[]): TlsRptTxtAnalysis {
   if (recordCount === 0) {
     lines.push({
       status: 'missing',
-      text: 'No TLS-RPT TXT (v=TLSRPTv1) at _smtp._tls.',
+      text: TLS_RPT_ABSENT_DETAIL_TEXT,
     });
     return {
       record: null,

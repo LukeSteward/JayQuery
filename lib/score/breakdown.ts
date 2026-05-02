@@ -10,6 +10,22 @@ export type GradeLine = {
   text: string;
 };
 
+/** DKIM missing breakdown — omitted when Detailed breakdown is off (card summary still shows). */
+export const DKIM_ABSENT_PROBE_DETAIL_TEXT =
+  'No DKIM DNS record at any probed selector.';
+
+const GRADE_LINE_TEXTS_HIDDEN_WHEN_COMPACT = new Set<string>([
+  DKIM_ABSENT_PROBE_DETAIL_TEXT,
+]);
+
+/** Compact cards: omit pass/info bullets and selected noisy absent-record lines; keep warn, fail, missing otherwise. */
+export function filterBreakdownForCompactMode(lines: GradeLine[]): GradeLine[] {
+  return lines.filter((l) => {
+    if (GRADE_LINE_TEXTS_HIDDEN_WHEN_COMPACT.has(l.text)) return false;
+    return l.status !== 'pass' && l.status !== 'info';
+  });
+}
+
 export function buildSpfBreakdown(a: SpfAnalysis): GradeLine[] {
   const lines: GradeLine[] = [];
   if (!a.present) {
@@ -101,9 +117,10 @@ export function buildDmarcBreakdown(
   });
   if (a.multipleRecords) {
     lines.push({
-      status: 'warn',
-      text: 'Multiple DMARC TXT records — recipients may pick unpredictably.',
+      status: 'fail',
+      text: 'Multiple DMARC TXT records — only one is valid per RFC 7489.',
     });
+    return lines;
   }
   switch (a.policy) {
     case 'reject':
@@ -168,8 +185,9 @@ export function buildDmarcBreakdown(
     });
   } else {
     lines.push({
-      status: 'info',
-      text: `Alignment: adkim=${a.adkim ?? 'r (default)'}, aspf=${a.aspf ?? 'r (default)'}.`,
+      status: 'warn',
+      text:
+        'Alignment is relaxed (adkim=r, aspf=r by default); strict alignment (adkim=s / aspf=s) increases this pillar score.',
     });
   }
   return lines;
@@ -187,7 +205,7 @@ export function buildDkimBreakdown(
   if (!d.raw) {
     lines.push({
       status: 'missing',
-      text: 'No DKIM DNS record at any probed selector.',
+      text: DKIM_ABSENT_PROBE_DETAIL_TEXT,
     });
     return lines;
   }

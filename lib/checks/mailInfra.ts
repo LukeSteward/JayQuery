@@ -9,8 +9,14 @@ import {
 } from '@/lib/dns/dohJson';
 import { resolveTxt } from '@/lib/dns/queryTxt';
 import { checkM365Tenant } from '@/lib/checks/microsoft365Tenant';
-import { analyzeMtaStsTxt } from '@/lib/parse/mtaStsRecord';
-import { analyzeTlsRptTxt } from '@/lib/parse/tlsRptRecord';
+import {
+  analyzeMtaStsTxt,
+  MTA_STS_ABSENT_DETAIL_TEXT,
+} from '@/lib/parse/mtaStsRecord';
+import {
+  analyzeTlsRptTxt,
+  TLS_RPT_ABSENT_DETAIL_TEXT,
+} from '@/lib/parse/tlsRptRecord';
 import { analyzeMxProviderGroup } from '@/lib/mailProviders/identifyMxProvider';
 import type { HealthStatus } from '@/lib/score/common';
 
@@ -212,6 +218,21 @@ async function checkTlsRpt(
   };
 }
 
+/** Shown when apex has no DNSKEY — also filtered from bullets when Detailed breakdown is off. */
+export const DNSSEC_NO_DNSKEY_DETAIL_TEXT =
+  'No DNSKEY records — DNSSEC not enabled (or wrong query name).';
+
+const MAIL_INFRA_LINES_HIDDEN_WHEN_COMPACT = new Set<string>([
+  MTA_STS_ABSENT_DETAIL_TEXT,
+  TLS_RPT_ABSENT_DETAIL_TEXT,
+  DNSSEC_NO_DNSKEY_DETAIL_TEXT,
+]);
+
+/** Omit noisy “record absent” bullets when Detailed breakdown is disabled (card summary/badge unchanged). */
+export function filterMailInfraLinesWhenCompact(lines: string[]): string[] {
+  return lines.filter((t) => !MAIL_INFRA_LINES_HIDDEN_WHEN_COMPACT.has(t));
+}
+
 function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
   const keyAnswers = r.answers.filter((a) => a.type === DNS_TYPE.DNSKEY);
 
@@ -243,9 +264,7 @@ function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
       title: 'DNSSEC',
       status: 'fail',
       summary: 'Not enabled',
-      lines: [
-        'No DNSKEY records — DNSSEC not enabled (or wrong query name).',
-      ],
+      lines: [DNSSEC_NO_DNSKEY_DETAIL_TEXT],
     };
   }
 

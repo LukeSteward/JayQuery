@@ -103,6 +103,16 @@ export function scoreDmarc(a: DmarcAnalysis, dmarcHost: string): ProtocolScore {
     };
   }
 
+  if (a.multipleRecords) {
+    return {
+      points: 0.5,
+      max: DMARC_MAX,
+      status: 'fail',
+      detail:
+        'Multiple DMARC TXT records found — only one is valid per RFC 7489.',
+    };
+  }
+
   let p = 1.0;
   switch (a.policy) {
     case 'reject':
@@ -127,10 +137,6 @@ export function scoreDmarc(a: DmarcAnalysis, dmarcHost: string): ProtocolScore {
 
   if (a.pct != null && a.pct < 100) {
     p -= 0.25;
-  }
-
-  if (a.multipleRecords) {
-    p -= 0.4;
   }
 
   p = Math.max(0, Math.min(DMARC_MAX, p));
@@ -222,4 +228,6 @@ export {
   buildDkimBreakdown,
   buildDmarcBreakdown,
   buildSpfBreakdown,
+  DKIM_ABSENT_PROBE_DETAIL_TEXT,
+  filterBreakdownForCompactMode,
 } from './breakdown';

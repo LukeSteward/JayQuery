@@ -21,6 +21,11 @@ export type ExtensionSettings = {
   toolbarIconDriver: ToolbarIconDriver;
   /** Which public DoH host is queried first (Google × Cloudflare). */
   dnsProvider: DnsProvider;
+  /**
+   * When true, SPF/DMARC/DKIM cards show every grading bullet (pass/info/warn/fail/missing).
+   * When false, only actionable lines (warn, fail, missing) are listed for compact results.
+   */
+  detailedBreakdown: boolean;
 };
 
 const STORAGE_KEY = 'dnsHealthSettings';
@@ -52,6 +57,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   treatDnsResolutionErrorsAsFailure: true,
   toolbarIconDriver: 'combined',
   dnsProvider: 'google',
+  detailedBreakdown: false,
 };
 
 export async function loadSettings(): Promise<ExtensionSettings> {
@@ -68,6 +74,10 @@ export async function loadSettings(): Promise<ExtensionSettings> {
         : DEFAULT_SETTINGS.treatDnsResolutionErrorsAsFailure,
     toolbarIconDriver: normalizeDriver(v?.toolbarIconDriver),
     dnsProvider: normalizeDnsProvider(v?.dnsProvider),
+    detailedBreakdown:
+      typeof v?.detailedBreakdown === 'boolean'
+        ? v.detailedBreakdown
+        : DEFAULT_SETTINGS.detailedBreakdown,
   };
 }
 

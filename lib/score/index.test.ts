@@ -42,6 +42,19 @@ describe('scoring', () => {
     expect(full.overall).toBeGreaterThan(5);
   });
 
+  it('multiple DMARC TXT records score fail like SPF duplicates', () => {
+    const dmarc = scoreDmarc(
+      analyzeDmarc([
+        'v=DMARC1; p=reject;',
+        'v=DMARC1; p=none;',
+      ]),
+      'dup.example',
+    );
+    expect(dmarc.status).toBe('fail');
+    expect(dmarc.points).toBe(0.5);
+    expect(dmarc.detail).toMatch(/Multiple DMARC/i);
+  });
+
   it('missing protocols score low', () => {
     const spf = scoreSpf(analyzeSpf([]));
     const dmarc = scoreDmarc(analyzeDmarc([]), 'x.test');

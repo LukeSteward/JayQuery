@@ -4,9 +4,15 @@ import {
   type CheckMode,
   type CheckResult,
 } from '@/lib/checkDomain';
+import { filterMailInfraLinesWhenCompact } from '@/lib/checks/mailInfra';
 import type { SpfMailProviderHint } from '@/lib/checks/mailProviderSpfHint';
 import { getActiveTabHostname } from '@/lib/tabHost';
-import type { FullScore, GradeLine, HealthStatus } from '@/lib/score';
+import {
+  filterBreakdownForCompactMode,
+  type FullScore,
+  type GradeLine,
+  type HealthStatus,
+} from '@/lib/score';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -293,9 +299,13 @@ function renderProtocolCard(
   rawLabel: string,
   rawSnippet: string | null,
   breakdown: GradeLine[],
+  detailedBreakdown: boolean,
   titleInfoTitle?: string,
   supplementalFooter?: string,
 ): string {
+  const breakdownLines = detailedBreakdown
+    ? breakdown
+    : filterBreakdownForCompactMode(breakdown);
   const rawBlock = rawSnippet
     ? `<details class="raw"><summary>${rawLabel}</summary><pre class="raw__pre">${escapeHtml(truncate(rawSnippet, 900))}</pre></details>`
     : '';
@@ -313,7 +323,7 @@ function renderProtocolCard(
       </div>
       <div class="card__points">${formatScoreTenth(score.points)} <span class="card__max">/ ${score.max}</span></div>
       <p class="card__detail">${escapeHtml(score.detail)}</p>
-      ${renderGradeBreakdown(breakdown)}
+      ${renderGradeBreakdown(breakdownLines)}
       ${rawBlock}
       ${supplementalFooter ?? ''}
     </article>
@@ -392,6 +402,7 @@ function renderMailInfraCard(
   status: HealthStatus,
   summary: string,
   lines: string[],
+  detailedBreakdown: boolean,
   raw?: string,
   tenantDirectoryId?: string,
 ): string {
@@ -406,7 +417,11 @@ function renderMailInfraCard(
       </button>
     </div>`
     : '';
-  const lis = lines.map((t) => `<li>${escapeHtml(t)}</li>`);
+  const resolvedLines = detailedBreakdown
+    ? lines
+    : filterMailInfraLinesWhenCompact(lines);
+  const showLines = detailedBreakdown || status !== 'pass';
+  const lis = showLines ? resolvedLines.map((t) => `<li>${escapeHtml(t)}</li>`) : [];
   const lineBlock =
     lis.length > 0 ? `<ul class="mail-infra-lines">${lis.join('')}</ul>` : '';
   return `
@@ -431,8 +446,15 @@ function renderResult(result: CheckResult): void {
   const { full } = result;
   const dkimRaw = result.dkim.raw;
   const tabDiffers = result.tabHostname !== result.queryHostname;
+  const detailedBreakdown = settings.detailedBreakdown;
   const castShameModal =
     full.dmarc.status === 'fail' ? renderCastShameModal(result) : '';
+
+  const spfSupplement =
+    result.spfMailProviderHint &&
+    (detailedBreakdown || result.spfMailProviderHint.status !== 'pass')
+      ? renderSpfMailProviderHint(result.spfMailProviderHint)
+      : '';
 
   root.innerHTML = `
     <div class="shell shell--with-fab">
@@ -454,10 +476,9 @@ function renderResult(result: CheckResult): void {
           'SPF record',
           result.spfRecords[0] ?? null,
           result.spfBreakdown,
+          detailedBreakdown,
           undefined,
-          result.spfMailProviderHint
-            ? renderSpfMailProviderHint(result.spfMailProviderHint)
-            : undefined,
+          spfSupplement || undefined,
         )}
         ${renderProtocolCard(
           'DMARC',
@@ -465,6 +486,7 @@ function renderResult(result: CheckResult): void {
           'DMARC record',
           result.dmarcRecords[0] ?? null,
           result.dmarcBreakdown,
+          detailedBreakdown,
           dmarcHint(result),
         )}
         ${renderProtocolCard(
@@ -473,6 +495,7 @@ function renderResult(result: CheckResult): void {
           `DKIM (${escapeHtml(result.dkim.selector)})`,
           dkimRaw,
           result.dkimBreakdown,
+          detailedBreakdown,
         )}
         ${result.mailInfra
           .map((c) =>
@@ -481,6 +504,7 @@ function renderResult(result: CheckResult): void {
               c.status,
               c.summary,
               c.lines,
+              detailedBreakdown,
               c.raw,
               c.tenantDirectoryId,
             ),
@@ -516,6 +540,13 @@ function renderSettings(): void {
             <span class="settings-row__hint">Good (check) / bad (X) glyphs from SPF, DMARC, and DKIM. Turn off to use a neutral gray icon.</span>
           </span>
           <input type="checkbox" id="setting-colored-icon" ${settings.coloredToolbarIcon ? 'checked' : ''} />
+        </label>
+        <label class="settings-row">
+          <span class="settings-row__text">
+            <strong>Detailed breakdown</strong>
+            <span class="settings-row__hint">Show all grading bullets when a check passes; when off, only warnings and issues are listed.</span>
+          </span>
+          <input type="checkbox" id="setting-detailed-breakdown" ${settings.detailedBreakdown ? 'checked' : ''} />
         </label>
         <fieldset class="settings-fieldset">
           <legend class="settings-fieldset__legend">Toolbar icon driver</legend>
@@ -595,6 +626,15 @@ function renderSettings(): void {
     });
   });
 
+  const detailedBreakdownEl = document.getElementById(
+    'setting-detailed-breakdown',
+  ) as HTMLInputElement | null;
+  detailedBreakdownEl?.addEventListener('change', () => {
+    void persistSettingsAndRefresh({
+      detailedBreakdown: detailedBreakdownEl.checked,
+    });
+  });
+
   document
     .querySelectorAll<HTMLInputElement>('input[name="toolbar-icon-driver"]')
     .forEach((el) => {
@@ -635,27 +675,58 @@ function bindSettingsFab(): void {
   });
 }
 
+function partialNeedsDnsRefresh(partial: Partial<ExtensionSettings>): boolean {
+  return (
+    partial.treatDnsResolutionErrorsAsFailure !== undefined ||
+    partial.dnsProvider !== undefined
+  );
+}
+
+function partialAffectsToolbarIcon(
+  partial: Partial<ExtensionSettings>,
+): boolean {
+  return (
+    partial.coloredToolbarIcon !== undefined ||
+    partial.toolbarIconDriver !== undefined
+  );
+}
+
 async function persistSettingsAndRefresh(
   partial: Partial<ExtensionSettings>,
 ): Promise<void> {
   settings = { ...settings, ...partial };
   await saveSettings(settings);
   if (!tabHostname) return;
+
+  const dnsRefresh = partialNeedsDnsRefresh(partial);
+
   if (currentView === 'settings') {
-    try {
-      const result = await runDnsCheck(tabHostname, lastMode, {
-        treatDnsResolutionErrorsAsFailure:
-          settings.treatDnsResolutionErrorsAsFailure,
-        dnsProvider: settings.dnsProvider,
-      });
-      lastResult = result;
-      await syncToolbarIconFromResult(result);
-    } catch {
-      /* keep prior lastResult */
+    if (dnsRefresh) {
+      try {
+        const result = await runDnsCheck(tabHostname, lastMode, {
+          treatDnsResolutionErrorsAsFailure:
+            settings.treatDnsResolutionErrorsAsFailure,
+          dnsProvider: settings.dnsProvider,
+        });
+        lastResult = result;
+        await syncToolbarIconFromResult(result);
+      } catch {
+        /* keep prior lastResult */
+      }
+    } else if (lastResult && partialAffectsToolbarIcon(partial)) {
+      await syncToolbarIconFromResult(lastResult);
     }
     return;
   }
-  await runCheck(lastMode);
+
+  if (dnsRefresh) {
+    await runCheck(lastMode);
+  } else if (lastResult) {
+    renderResult(lastResult);
+    if (partialAffectsToolbarIcon(partial)) {
+      void syncToolbarIconFromResult(lastResult);
+    }
+  }
 }
 
 function bindModeButtons(mode: CheckMode, loading: boolean): void {
