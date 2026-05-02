@@ -1,11 +1,13 @@
 # Builds a distributable Chrome MV3 zip (WXT) and uploads it as a workflow artifact.
 # Download: repo → Actions → latest run → Artifacts. Unzip, then chrome://extensions → Load unpacked → select the extracted folder.
 #
-# GitHub Release (tag only):
-#   1. Set "version" in package.json and commit to main.
-#   2. git tag vX.Y.Z && git push origin vX.Y.Z   (tag must be v{version} or the workflow fails)
-#   3. The release job attaches the zip and uses GitHub-generated release notes.
-#   workflow_dispatch and push to main only produce the artifact, not a Release.
+# GitHub Release (automatic on main):
+#   1. Bump "version" in package.json, commit, and push to main.
+#   2. This workflow builds the zip. If there is no tag v{version} on the remote yet,
+#      it creates that tag on the pushed commit, publishes a Release, and attaches the zip
+#      with GitHub-generated release notes.
+#   3. Pushes that only change code but not version (tag already exists) still build the
+#      artifact but skip the release job.
 
 name: Extension zip
 
@@ -13,7 +15,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    tags: ['v*']
 
 concurrency:
   group: extension-zip-${{ github.workflow }}-${{ github.ref }}
@@ -24,19 +25,31 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+      should_release: ${{ steps.tag_check.outputs.should_release }}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Verify tag matches package.json version
-        if: startsWith(github.ref, 'refs/tags/v')
+      - id: pkg
+        name: Read package version
         run: |
           VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")
-          TAG="${GITHUB_REF_NAME}"
-          EXPECTED="v${VERSION}"
-          if [ "$TAG" != "$EXPECTED" ]; then
-            echo "::error::Tag \"$TAG\" must equal package.json version as v-prefix (expected \"$EXPECTED\")."
-            exit 1
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - id: tag_check
+        name: Check if release tag already exists
+        env:
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          REF="refs/tags/v${VERSION}"
+          if [ -n "$(git ls-remote origin "${REF}")" ]; then
+            echo "Remote ${REF} already exists — skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ${REF} on remote — will create release and tag."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/setup-node@v6
@@ -59,7 +72,7 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.build.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -74,6 +87,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.build.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: release-assets/*.zip
           generate_release_notes: true
           fail_on_unmatched_files: true
