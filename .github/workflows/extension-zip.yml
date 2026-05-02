@@ -35,5 +35,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: jayquery-chrome-mv3
+          include-hidden-files: true
           path: .output/*.zip
           if-no-files-found: error
