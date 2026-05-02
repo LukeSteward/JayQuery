@@ -1,7 +1,7 @@
-import type { SpfAnalysis } from '@/lib/parse/spf';
+import { isNullSpf, type SpfAnalysis } from '@/lib/parse/spf';
 import type { DmarcAnalysis } from '@/lib/parse/dmarc';
 import type { DkimRecordAnalysis } from '@/lib/parse/dkim';
-import { getDkimSelectors } from '@/lib/parse/dkim';
+import { getDkimSelectors, isNullDkimDeclaration } from '@/lib/parse/dkim';
 import type { HealthStatus } from '@/lib/score/common';
 
 /** Granular grading lines for SPF / DMARC / DKIM cards. */
@@ -12,7 +12,7 @@ export type GradeLine = {
 
 /** DKIM missing breakdown; omitted when Detailed breakdown is off (card summary still shows). */
 export const DKIM_ABSENT_PROBE_DETAIL_TEXT =
-  'No DKIM DNS record at any probed selector.';
+  'No DKIM TXT at *._domainkey, _domainkey, or any probed selector.';
 
 const GRADE_LINE_TEXTS_HIDDEN_WHEN_COMPACT = new Set<string>([
   DKIM_ABSENT_PROBE_DETAIL_TEXT,
@@ -36,6 +36,12 @@ export function buildSpfBreakdown(a: SpfAnalysis): GradeLine[] {
     return lines;
   }
   lines.push({ status: 'pass', text: 'SPF record found (v=spf1).' });
+  if (isNullSpf(a)) {
+    lines.push({
+      status: 'pass',
+      text: 'Null SPF (-all only).',
+    });
+  }
   if (a.multipleRecords) {
     lines.push({
       status: 'fail',
@@ -195,12 +201,15 @@ export function buildDmarcBreakdown(
 
 export function buildDkimBreakdown(
   d: DkimRecordAnalysis & { selector: string },
+  queryHost?: string,
 ): GradeLine[] {
   const lines: GradeLine[] = [];
   const selectors = getDkimSelectors().join(', ');
   lines.push({
     status: 'info',
-    text: `Probed selectors: ${selectors}.`,
+    text: queryHost
+      ? `Probed *._domainkey.${queryHost} first, then _domainkey.${queryHost} and selectors ${selectors}.`
+      : `Probed selectors: ${selectors}.`,
   });
   if (!d.raw) {
     lines.push({
@@ -222,12 +231,22 @@ export function buildDkimBreakdown(
     });
   }
   if (d.publicKeyEmpty) {
-    lines.push({
-      status: d.hasVersion ? 'warn' : 'fail',
-      text: d.hasVersion
-        ? 'p= is empty; key may be revoked.'
-        : 'No published public key (p=).',
-    });
+    if (isNullDkimDeclaration(d) && (d.selector === '_domainkey' || d.selector === '*')) {
+      lines.push({
+        status: 'pass',
+        text:
+          d.selector === '*'
+            ? 'Null DKIM at *._domainkey (v=DKIM1; empty or omitted p=) — valid declaration.'
+            : 'Null DKIM at _domainkey (v=DKIM1; empty or omitted p=) — valid declaration.',
+      });
+    } else {
+      lines.push({
+        status: d.hasVersion ? 'warn' : 'fail',
+        text: d.hasVersion
+          ? 'p= is empty; key may be revoked.'
+          : 'No published public key (p=).',
+      });
+    }
   } else {
     lines.push({
       status: 'pass',

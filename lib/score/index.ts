@@ -1,6 +1,6 @@
-import type { SpfAnalysis } from '@/lib/parse/spf';
+import { isNullSpf, type SpfAnalysis } from '@/lib/parse/spf';
 import type { DmarcAnalysis } from '@/lib/parse/dmarc';
-import type { DkimRecordAnalysis } from '@/lib/parse/dkim';
+import { isNullDkimDeclaration, type DkimRecordAnalysis } from '@/lib/parse/dkim';
 import type { HealthStatus } from '@/lib/score/common';
 
 export type { HealthStatus };
@@ -85,11 +85,12 @@ export function scoreSpf(a: SpfAnalysis): ProtocolScore {
     a.lookupApprox > 10
       ? ` ~${a.lookupApprox} mechanisms that may trigger DNS lookups (limit 10).`
       : '';
+  const nullNote = isNullSpf(a) ? ' Null SPF (-all only).' : '';
   return {
     points: p,
     max: SPF_MAX,
     status,
-    detail: `SPF is present.${lookupNote}`.trim(),
+    detail: `SPF is present.${nullNote}${lookupNote}`.trim(),
   };
 }
 
@@ -164,7 +165,23 @@ export function scoreDkim(
       points: 0,
       max: DKIM_MAX,
       status: 'missing',
-      detail: 'No DKIM DNS record at common selectors for this hostname.',
+      detail:
+        'No DKIM DNS record at *._domainkey, _domainkey, or common selectors for this hostname.',
+    };
+  }
+  if (
+    (best.selector === '_domainkey' || best.selector === '*') &&
+    isNullDkimDeclaration(best)
+  ) {
+    const where =
+      best.selector === '*'
+        ? '*._domainkey (wildcard selector name)'
+        : '_domainkey (zone apex)';
+    return {
+      points: 2.9,
+      max: DKIM_MAX,
+      status: 'pass',
+      detail: `Null DKIM at ${where} (v=DKIM1; empty p); zone declares no signing key here.`,
     };
   }
   if (best.publicKeyEmpty && best.hasVersion) {

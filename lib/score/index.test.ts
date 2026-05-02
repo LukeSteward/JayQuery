@@ -12,6 +12,7 @@ import {
 describe('scoring', () => {
   it('SPF with -all and within lookup cap reaches full SPF points', () => {
     expect(scoreSpf(analyzeSpf(['v=spf1 -all'])).points).toBe(3);
+    expect(scoreSpf(analyzeSpf(['v=spf1 -all'])).detail).toContain('Null SPF');
     expect(
       scoreSpf(
         analyzeSpf([
@@ -53,6 +54,21 @@ describe('scoring', () => {
     expect(dmarc.status).toBe('fail');
     expect(dmarc.points).toBe(0.5);
     expect(dmarc.detail).toMatch(/Multiple DMARC/i);
+  });
+
+  it('null DKIM declaration at * or _domainkey selector scores pass', () => {
+    for (const selector of ['*', '_domainkey'] as const) {
+      const dkim = scoreDkim({
+        valid: false,
+        selector,
+        hasVersion: true,
+        keyType: 'rsa',
+        publicKeyEmpty: true,
+        raw: 'v=DKIM1; p=',
+      });
+      expect(dkim.status).toBe('pass');
+      expect(dkim.points).toBe(2.9);
+    }
   });
 
   it('missing protocols score low', () => {

@@ -77,7 +77,10 @@ describe('runDnsCheck DNS resolution errors', () => {
         if (name === '_dmarc.example.com') {
           return { strings: ['v=DMARC1; p=reject;'], dnsState: 'ok' };
         }
-        if (name.includes('._domainkey.')) {
+        if (
+          name === '_domainkey.example.com' ||
+          name.includes('._domainkey.')
+        ) {
           return { strings: [], dnsState: 'error' };
         }
         return { strings: [], dnsState: 'ok' };

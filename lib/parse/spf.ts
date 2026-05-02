@@ -106,3 +106,58 @@ export function analyzeSpf(txtRecords: string[]): SpfAnalysis {
     rawRecords: [...spfLike],
   };
 }
+
+function isAllMechanismToken(t: string): boolean {
+  return /^(?:[+\-~?])?all$/i.test(t.trim());
+}
+
+function tokenAuthorizesOrRedirects(t: string): boolean {
+  const x = t.trim();
+  if (/^redirect=/i.test(x)) return true;
+  if (/^(?:\+|-|~|\?)?include:/i.test(x)) return true;
+  if (/^(?:\+|-|~|\?)?a(?:[:/]|$)/i.test(x)) return true;
+  if (/^(?:\+|-|~|\?)?mx(?::|\/|$)/i.test(x)) return true;
+  if (/^(?:\+|-|~|\?)?ptr(?::|$)/i.test(x)) return true;
+  if (/^(?:\+|-|~|\?)?exists:/i.test(x)) return true;
+  if (/^(?:\+|-|~|\?)?ip[46]:/i.test(x)) return true;
+  return false;
+}
+
+/**
+ * SPF that does not authorise any senders: ends with `-all` and has no ip/include/a/mx/ptr/exists/redirect, etc.
+ * Typical form `v=spf1 -all` (optional `exp=` / `rf=` modifiers allowed).
+ */
+export function isNullSpf(a: SpfAnalysis): boolean {
+  if (
+    !a.present ||
+    a.multipleRecords ||
+    a.openAll ||
+    a.allQualifier !== 'fail'
+  ) {
+    return false;
+  }
+  const record = a.rawRecords[0] ?? '';
+  const tokens = record.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return false;
+  if (!tokens[0].trim().toLowerCase().startsWith(SPF_PREFIX)) return false;
+
+  let sawHardAll = false;
+  for (let i = 1; i < tokens.length; i++) {
+    const t = tokens[i].trim();
+    if (/^-all$/i.test(t)) {
+      sawHardAll = true;
+      continue;
+    }
+    if (isAllMechanismToken(t)) {
+      continue;
+    }
+    if (/^exp=/i.test(t) || /^rf=/i.test(t)) {
+      continue;
+    }
+    if (tokenAuthorizesOrRedirects(t)) {
+      return false;
+    }
+    return false;
+  }
+  return sawHardAll;
+}

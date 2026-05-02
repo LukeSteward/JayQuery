@@ -22,6 +22,13 @@ export function getDkimSelectors(): readonly string[] {
   return DKIM_SELECTORS;
 }
 
+/**
+ * FQDN for the literal DKIM selector `*` (same as `nslookup -type=txt *._domainkey.example.com`).
+ */
+export function dkimDnsWildcardFqdn(queryHost: string): string {
+  return `*._domainkey.${queryHost}`;
+}
+
 function parseDkimTags(record: string): Map<string, string> {
   const map = new Map<string, string>();
   const parts = record.split(';').map((p) => p.trim()).filter(Boolean);
@@ -63,4 +70,9 @@ export function analyzeDkimRecord(txt: string | null): DkimRecordAnalysis {
     publicKeyEmpty,
     raw: trimmed,
   };
+}
+
+/** DKIM TXT at `_domainkey.<domain>` with `v=DKIM1` and empty/missing `p=` (revoked / no keys published). */
+export function isNullDkimDeclaration(a: DkimRecordAnalysis): boolean {
+  return Boolean(a.raw && a.hasVersion && a.publicKeyEmpty);
 }

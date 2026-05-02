@@ -6,6 +6,7 @@ import {
   resolveNs,
   type DohResult,
   type DohResolveOptions,
+  type MxRecord,
 } from '@/lib/dns/dohJson';
 import { resolveTxt } from '@/lib/dns/queryTxt';
 import { checkM365Tenant } from '@/lib/checks/microsoft365Tenant';
@@ -53,11 +54,15 @@ function mxRecordsDetectedPhrase(n: number): string {
   return n === 1 ? '1 MX record detected' : `${n} MX records detected`;
 }
 
-async function checkMx(
-  domain: string,
-  dns?: MailInfraCheckOptions,
-): Promise<MailInfraCheck> {
-  const mx = await resolveMx(domain, { dnsProvider: dns?.dnsProvider });
+function isNullMx(mx: MxRecord[]): boolean {
+  return (
+    mx.length === 1 &&
+    mx[0].priority === 0 &&
+    (mx[0].exchange === '.' || mx[0].exchange === '')
+  );
+}
+
+function checkMxFromRecords(mx: MxRecord[], domain: string): MailInfraCheck {
   if (mx.length === 0) {
     return {
       id: 'mx',
@@ -69,22 +74,23 @@ async function checkMx(
       ],
     };
   }
-  const nullMx =
-    mx.length === 1 &&
-    mx[0].priority === 0 &&
-    (mx[0].exchange === '.' || mx[0].exchange === '');
-  if (nullMx) {
+  if (isNullMx(mx)) {
     return {
       id: 'mx',
       title: 'MX',
       status: 'pass',
       summary: 'Null MX (no inbound mail)',
-      lines: ['Null MX present; domain should not receive SMTP.'],
+      lines: [
+        'RFC 7505 null MX: single record priority 0, target "." — domain declines inbound SMTP.',
+      ],
       raw: '0 .',
     };
   }
   const raw = mx.map((m) => `${m.priority} ${m.exchange}`).join('\n');
-  const { identified, allSameProvider } = analyzeMxProviderGroup(mx, domain);
+  const { identified, allSameProvider } = analyzeMxProviderGroup(
+    mx,
+    domain,
+  );
 
   let lines: string[];
   if (identified) {
@@ -314,8 +320,9 @@ export async function runMailInfraChecks(
 ): Promise<MailInfraCheck[]> {
   const d = mailDomain.toLowerCase();
   const dns = options;
-  const [mx, ns, mtaSts, tlsRpt, dnssec, m365Tenant] = await Promise.all([
-    checkMx(d, dns),
+  const mxRecs = await resolveMx(d, { dnsProvider: dns?.dnsProvider });
+  const mx = checkMxFromRecords(mxRecs, d);
+  const [ns, mtaSts, tlsRpt, dnssec, m365Tenant] = await Promise.all([
     checkNs(d, dns),
     checkMtaSts(d, dns),
     checkTlsRpt(d, dns),
