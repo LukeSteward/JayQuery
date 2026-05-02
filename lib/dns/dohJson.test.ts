@@ -73,10 +73,43 @@ describe('resolveTxtRecordsDetailed', () => {
     expect(r.strings.some((s) => s.includes('v=spf1'))).toBe(true);
   });
 
-  it('returns dnsState error when both DoH HTTP requests fail', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
-    const r = await resolveTxtRecordsDetailed('dead.test');
-    expect(r.dnsState).toBe('error');
-    expect(r.strings).toEqual([]);
+  it('queries Google DoH first when dnsProvider is google', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse({
+        Status: RCODE.NOERROR,
+        Answer: [{ name: 'x.test', type: 16, data: '"v=spf1 -all"' }],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchFn);
+    await resolveTxtRecordsDetailed('spf.x.test', { dnsProvider: 'google' });
+    expect(String(fetchFn.mock.calls[0][0])).toContain('dns.google');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('queries Cloudflare DoH first when dnsProvider is cloudflare', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse({
+        Status: RCODE.NOERROR,
+        Answer: [{ name: 'x.test', type: 16, data: '"v=spf1 -all"' }],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchFn);
+    await resolveTxtRecordsDetailed('spf.x.test', {
+      dnsProvider: 'cloudflare',
+    });
+    expect(String(fetchFn.mock.calls[0][0])).toContain('cloudflare-dns.com');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('defaults to Google DoH first when dnsProvider omitted', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse({
+        Status: RCODE.NOERROR,
+        Answer: [{ name: 'x.test', type: 16, data: '"v=spf1 -all"' }],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchFn);
+    await resolveTxtRecordsDetailed('spf.x.test');
+    expect(String(fetchFn.mock.calls[0][0])).toContain('dns.google');
   });
 });

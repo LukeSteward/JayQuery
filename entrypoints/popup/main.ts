@@ -13,6 +13,7 @@ import {
   saveSettings,
   type ExtensionSettings,
   type ToolbarIconDriver,
+  type DnsProvider,
 } from '@/lib/settings';
 import {
   applyToolbarIconForTab,
@@ -107,7 +108,11 @@ function mxtoolboxEmailHealthUrl(domain: string): string {
   return `https://mxtoolbox.com/emailhealth/${encodeURIComponent(domain)}`;
 }
 
+const DNS_TECHNIQUE_DISCLOSURE =
+  'DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only — no MTA-STS policy files or cert inspection. DKIM uses common selectors only.';
+
 const WALL_OF_SHAME_REPO = 'jkerai1/DMARC-WallOfShame';
+
 
 function wallOfShameNewIssueUrl(company: string, result: CheckResult): string {
   const domain = result.dmarcLookupHost;
@@ -484,7 +489,6 @@ function renderResult(result: CheckResult): void {
       </div>
 
       <footer class="footer">
-        <p>DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only — no MTA-STS policy files or cert inspection. DKIM uses common selectors only.</p>
         ${renderResultFooterActions(result)}
       </footer>
       ${castShameModal}
@@ -540,6 +544,25 @@ function renderSettings(): void {
           </span>
           <input type="checkbox" id="setting-dns-errors-fail" ${settings.treatDnsResolutionErrorsAsFailure ? 'checked' : ''} />
         </label>
+
+        <details class="settings-advanced">
+          <summary class="settings-advanced__summary">Advanced</summary>
+          <div class="settings-advanced__inner">
+            <fieldset class="settings-fieldset settings-fieldset--in-advanced">
+              <legend class="settings-fieldset__legend">DNS-over-HTTPS</legend>
+              <p class="settings-fieldset__hint">Primary resolver. On fetch failure or an empty OK response JayQuery retries with the alternate public resolver (Google and Cloudflare).</p>
+              <label class="settings-radio">
+                <input type="radio" name="dns-provider" value="google" ${settings.dnsProvider === 'google' ? 'checked' : ''} />
+                <span><strong>Google</strong> — query Google DNS first</span>
+              </label>
+              <label class="settings-radio">
+                <input type="radio" name="dns-provider" value="cloudflare" ${settings.dnsProvider === 'cloudflare' ? 'checked' : ''} />
+                <span><strong>Cloudflare</strong> — query Cloudflare first</span>
+              </label>
+            </fieldset>
+            <p class="settings-dns-disclaimer">${escapeHtml(DNS_TECHNIQUE_DISCLOSURE)}</p>
+          </div>
+        </details>
       </div>
     </div>
   `;
@@ -582,6 +605,17 @@ function renderSettings(): void {
         });
       });
     });
+
+  document
+    .querySelectorAll<HTMLInputElement>('input[name="dns-provider"]')
+    .forEach((el) => {
+      el.addEventListener('change', () => {
+        if (!el.checked) return;
+        void persistSettingsAndRefresh({
+          dnsProvider: el.value as DnsProvider,
+        });
+      });
+    });
 }
 
 function bindMailInfraCopyButtons(): void {
@@ -612,6 +646,7 @@ async function persistSettingsAndRefresh(
       const result = await runDnsCheck(tabHostname, lastMode, {
         treatDnsResolutionErrorsAsFailure:
           settings.treatDnsResolutionErrorsAsFailure,
+        dnsProvider: settings.dnsProvider,
       });
       lastResult = result;
       await syncToolbarIconFromResult(result);
@@ -646,6 +681,7 @@ async function runCheck(mode: CheckMode): Promise<void> {
     const result = await runDnsCheck(tabHostname, mode, {
       treatDnsResolutionErrorsAsFailure:
         settings.treatDnsResolutionErrorsAsFailure,
+      dnsProvider: settings.dnsProvider,
     });
     lastResult = result;
     await syncToolbarIconFromResult(result);

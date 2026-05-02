@@ -1,8 +1,9 @@
 /**
- * DNS-over-HTTPS JSON API (Cloudflare primary, Google fallback).
+ * DNS-over-HTTPS JSON API (choice of Google-first or Cloudflare-first, with fallback).
  * @see https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-json
  */
 
+import type { DnsProvider } from '@/lib/settings';
 import { decodeTxtRdata } from '@/lib/dns/txtDecode';
 
 const CF_BASE = 'https://cloudflare-dns.com/dns-query';
@@ -43,6 +44,20 @@ export const RCODE = {
   NXDOMAIN: 3,
 } as const;
 
+/** Options shared by TXT/MX/NS/DNSSEC DoH lookups. */
+export type DohResolveOptions = {
+  dnssec?: boolean;
+  fallbackWhenEmpty?: boolean;
+  /** Default `google` (matches extension settings default). */
+  dnsProvider?: DnsProvider;
+};
+
+function dohBaseOrder(dnsProvider: DnsProvider): [string, string] {
+  return dnsProvider === 'google'
+    ? [GOOGLE_BASE, CF_BASE]
+    : [CF_BASE, GOOGLE_BASE];
+}
+
 function buildUrl(
   base: string,
   name: string,
@@ -80,28 +95,37 @@ async function fetchDoh(url: string): Promise<DohResult> {
 async function resolveDnsOutcome(
   name: string,
   type: number,
-  options?: { dnssec?: boolean; fallbackWhenEmpty?: boolean },
+  options?: DohResolveOptions,
 ): Promise<ResolveDnsOutcome> {
   const dnssec = options?.dnssec ?? false;
   const fallbackWhenEmpty = options?.fallbackWhenEmpty ?? true;
+  const dnsProvider = options?.dnsProvider ?? 'google';
+  const [primaryBase, fallbackBase] = dohBaseOrder(dnsProvider);
 
-  const cfUrl = buildUrl(CF_BASE, name, type, dnssec);
-  try {
-    const cf = await fetchDoh(cfUrl);
-    if (
+  const tryFetch = async (base: string): Promise<DohResult> => {
+    const url = buildUrl(base, name, type, dnssec);
+    return fetchDoh(url);
+  };
+
+  function shouldUseResult(o: DohResult): boolean {
+    return (
       !fallbackWhenEmpty ||
-      cf.answers.length > 0 ||
-      cf.status !== RCODE.NOERROR
-    ) {
-      return { ...cf, fetchFailed: false };
+      o.answers.length > 0 ||
+      o.status !== RCODE.NOERROR
+    );
+  }
+
+  try {
+    const first = await tryFetch(primaryBase);
+    if (shouldUseResult(first)) {
+      return { ...first, fetchFailed: false };
     }
   } catch {
-    // fall through
+    /* try fallback provider */
   }
-  const gUrl = buildUrl(GOOGLE_BASE, name, type, dnssec);
   try {
-    const google = await fetchDoh(gUrl);
-    return { ...google, fetchFailed: false };
+    const second = await tryFetch(fallbackBase);
+    return { ...second, fetchFailed: false };
   } catch {
     return {
       status: FETCH_FAILED_STATUS,
@@ -113,13 +137,13 @@ async function resolveDnsOutcome(
 }
 
 /**
- * Query public DoH — try Cloudflare then Google on failure or empty NOERROR.
+ * Query public DoH — primary resolver from settings preference, alternate on failure or empty NOERROR.
  * Throws if both providers fail the HTTP request (legacy behaviour for MX/NS).
  */
 export async function resolveDns(
   name: string,
   type: number,
-  options?: { dnssec?: boolean; fallbackWhenEmpty?: boolean },
+  options?: DohResolveOptions,
 ): Promise<DohResult> {
   const o = await resolveDnsOutcome(name, type, options);
   if (o.fetchFailed) {
@@ -147,10 +171,12 @@ function classifyTxtDnsState(o: ResolveDnsOutcome): TxtDnsState {
  */
 export async function resolveTxtRecordsDetailed(
   name: string,
+  options?: DohResolveOptions,
 ): Promise<TxtRecordsDetailed> {
   const o = await resolveDnsOutcome(name, DNS_TYPE.TXT, {
     dnssec: false,
     fallbackWhenEmpty: true,
+    ...options,
   });
   const dnsState = classifyTxtDnsState(o);
   if (dnsState !== 'ok') {
@@ -170,8 +196,11 @@ export async function resolveTxtRecordsDetailed(
 }
 
 /** TXT record strings for `name` (legacy helper for mail-infra and simple callers). */
-export async function resolveTxtRecords(name: string): Promise<string[]> {
-  const d = await resolveTxtRecordsDetailed(name);
+export async function resolveTxtRecords(
+  name: string,
+  options?: DohResolveOptions,
+): Promise<string[]> {
+  const d = await resolveTxtRecordsDetailed(name, options);
   return d.strings;
 }
 
@@ -187,10 +216,14 @@ export function parseMxRdata(data: string): MxRecord | null {
   return { priority, exchange };
 }
 
-export async function resolveMx(name: string): Promise<MxRecord[]> {
+export async function resolveMx(
+  name: string,
+  options?: Pick<DohResolveOptions, 'dnsProvider'>,
+): Promise<MxRecord[]> {
   const r = await resolveDns(name, DNS_TYPE.MX, {
     dnssec: false,
     fallbackWhenEmpty: true,
+    dnsProvider: options?.dnsProvider,
   });
   if (r.status !== RCODE.NOERROR) {
     return [];
@@ -204,10 +237,14 @@ export async function resolveMx(name: string): Promise<MxRecord[]> {
   return rows.sort((x, y) => x.priority - y.priority);
 }
 
-export async function resolveNs(name: string): Promise<string[]> {
+export async function resolveNs(
+  name: string,
+  options?: Pick<DohResolveOptions, 'dnsProvider'>,
+): Promise<string[]> {
   const r = await resolveDns(name, DNS_TYPE.NS, {
     dnssec: false,
     fallbackWhenEmpty: true,
+    dnsProvider: options?.dnsProvider,
   });
   if (r.status !== RCODE.NOERROR) {
     return [];

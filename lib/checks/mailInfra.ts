@@ -5,6 +5,7 @@ import {
   resolveMx,
   resolveNs,
   type DohResult,
+  type DohResolveOptions,
 } from '@/lib/dns/dohJson';
 import { resolveTxt } from '@/lib/dns/queryTxt';
 import { checkM365Tenant } from '@/lib/checks/microsoft365Tenant';
@@ -12,6 +13,8 @@ import { analyzeMtaStsTxt } from '@/lib/parse/mtaStsRecord';
 import { analyzeTlsRptTxt } from '@/lib/parse/tlsRptRecord';
 import { analyzeMxProviderGroup } from '@/lib/mailProviders/identifyMxProvider';
 import type { HealthStatus } from '@/lib/score/common';
+
+export type MailInfraCheckOptions = Pick<DohResolveOptions, 'dnsProvider'>;
 
 export type MailInfraCheck = {
   id: 'mx' | 'ns' | 'mtaSts' | 'tlsRpt' | 'dnssec' | 'm365Tenant';
@@ -44,8 +47,11 @@ function mxRecordsDetectedPhrase(n: number): string {
   return n === 1 ? '1 MX record detected' : `${n} MX records detected`;
 }
 
-async function checkMx(domain: string): Promise<MailInfraCheck> {
-  const mx = await resolveMx(domain);
+async function checkMx(
+  domain: string,
+  dns?: MailInfraCheckOptions,
+): Promise<MailInfraCheck> {
+  const mx = await resolveMx(domain, { dnsProvider: dns?.dnsProvider });
   if (mx.length === 0) {
     return {
       id: 'mx',
@@ -127,8 +133,11 @@ async function checkMx(domain: string): Promise<MailInfraCheck> {
   };
 }
 
-async function checkNs(domain: string): Promise<MailInfraCheck> {
-  const ns = await resolveNs(domain);
+async function checkNs(
+  domain: string,
+  dns?: MailInfraCheckOptions,
+): Promise<MailInfraCheck> {
+  const ns = await resolveNs(domain, { dnsProvider: dns?.dnsProvider });
   if (ns.length === 0) {
     return {
       id: 'ns',
@@ -157,8 +166,11 @@ async function checkNs(domain: string): Promise<MailInfraCheck> {
   };
 }
 
-async function checkMtaSts(domain: string): Promise<MailInfraCheck> {
-  const txts = await resolveTxt(`_mta-sts.${domain}`);
+async function checkMtaSts(
+  domain: string,
+  dns?: MailInfraCheckOptions,
+): Promise<MailInfraCheck> {
+  const txts = await resolveTxt(`_mta-sts.${domain}`, dns);
   const a = analyzeMtaStsTxt(txts);
   const lineStatuses = a.lines.map((l) => l.status);
   const rolled = foldSeverity(lineStatuses);
@@ -177,8 +189,11 @@ async function checkMtaSts(domain: string): Promise<MailInfraCheck> {
   };
 }
 
-async function checkTlsRpt(domain: string): Promise<MailInfraCheck> {
-  const txts = await resolveTxt(`_smtp._tls.${domain}`);
+async function checkTlsRpt(
+  domain: string,
+  dns?: MailInfraCheckOptions,
+): Promise<MailInfraCheck> {
+  const txts = await resolveTxt(`_smtp._tls.${domain}`, dns);
   const a = analyzeTlsRptTxt(txts);
   const lineStatuses = a.lines.map((l) => l.status);
   const rolled = foldSeverity(lineStatuses);
@@ -258,10 +273,14 @@ function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
   };
 }
 
-async function checkDnssec(domain: string): Promise<MailInfraCheck> {
+async function checkDnssec(
+  domain: string,
+  dns?: MailInfraCheckOptions,
+): Promise<MailInfraCheck> {
   const r = await resolveDns(domain, DNS_TYPE.DNSKEY, {
     dnssec: true,
     fallbackWhenEmpty: true,
+    dnsProvider: dns?.dnsProvider,
   });
   return interpretDnssec(r, domain);
 }
@@ -272,14 +291,16 @@ async function checkDnssec(domain: string): Promise<MailInfraCheck> {
  */
 export async function runMailInfraChecks(
   mailDomain: string,
+  options?: MailInfraCheckOptions,
 ): Promise<MailInfraCheck[]> {
   const d = mailDomain.toLowerCase();
+  const dns = options;
   const [mx, ns, mtaSts, tlsRpt, dnssec, m365Tenant] = await Promise.all([
-    checkMx(d),
-    checkNs(d),
-    checkMtaSts(d),
-    checkTlsRpt(d),
-    checkDnssec(d),
+    checkMx(d, dns),
+    checkNs(d, dns),
+    checkMtaSts(d, dns),
+    checkTlsRpt(d, dns),
+    checkDnssec(d, dns),
     checkM365Tenant(d),
   ]);
   return [mx, ns, mtaSts, tlsRpt, dnssec, m365Tenant];

@@ -6,6 +6,7 @@ import {
 } from '@/lib/checks/mailProviderSpfHint';
 import { resolveTxtDetailed } from '@/lib/dns/queryTxt';
 import type { TxtRecordsDetailed } from '@/lib/dns/dohJson';
+import type { DnsProvider } from '@/lib/settings';
 import { analyzeSpf } from '@/lib/parse/spf';
 import { analyzeDmarc } from '@/lib/parse/dmarc';
 import {
@@ -31,6 +32,8 @@ export type CheckMode = 'apex' | 'exact';
 export type DnsCheckOptions = {
   /** When true, SERVFAIL / fetch failure count as fail for SPF/DMARC/DKIM. Default true. */
   treatDnsResolutionErrorsAsFailure?: boolean;
+  /** Which public DoH endpoint is queried first. Default `google`. */
+  dnsProvider?: DnsProvider;
 };
 
 export type CheckResult = {
@@ -111,16 +114,17 @@ export async function runDnsCheck(
   options?: DnsCheckOptions,
 ): Promise<CheckResult> {
   const treatDnsAsFail = options?.treatDnsResolutionErrorsAsFailure ?? true;
+  const dnsTxt = { dnsProvider: options?.dnsProvider };
   const { tab, orgDomain, queryHost } = resolveCheckTargets(tabHostname, mode);
   const dmarcFqdn = `_dmarc.${orgDomain}`;
 
-  const orgSpfPromise = resolveTxtDetailed(orgDomain);
+  const orgSpfPromise = resolveTxtDetailed(orgDomain, dnsTxt);
   const [spfDetailed, dmarcDetailed, mailInfra] = await Promise.all([
     queryHost === orgDomain
       ? orgSpfPromise
-      : resolveTxtDetailed(queryHost),
-    resolveTxtDetailed(dmarcFqdn),
-    runMailInfraChecks(orgDomain),
+      : resolveTxtDetailed(queryHost, dnsTxt),
+    resolveTxtDetailed(dmarcFqdn, dnsTxt),
+    runMailInfraChecks(orgDomain, dnsTxt),
   ]);
   const orgSpfDetailed =
     queryHost === orgDomain ? spfDetailed : await orgSpfPromise;
@@ -153,7 +157,7 @@ export async function runDnsCheck(
 
   for (const sel of getDkimSelectors()) {
     const name = `${sel}._domainkey.${queryHost}`;
-    const det = await resolveTxtDetailed(name);
+    const det = await resolveTxtDetailed(name, dnsTxt);
     if (det.dnsState === 'ok' || det.dnsState === 'nxdomain') {
       hadDefinitiveDkimLookup = true;
     }

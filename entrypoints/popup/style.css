@@ -442,6 +442,59 @@ body {
   line-height: 1.35;
 }
 
+.settings-advanced {
+  margin: 8px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-advanced__summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 14px 0 10px;
+  user-select: none;
+}
+
+.settings-advanced__summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-advanced__summary::before {
+  content: '';
+  display: inline-block;
+  margin-right: 6px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  padding: 2.5px;
+  transform: rotate(-45deg);
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
+.settings-advanced[open] .settings-advanced__summary::before {
+  transform: rotate(45deg);
+  margin-bottom: 1px;
+}
+
+.settings-advanced__inner {
+  padding-bottom: 4px;
+}
+
+.settings-fieldset--in-advanced {
+  border-top: none;
+  padding-top: 4px;
+  margin-bottom: 0;
+}
+
+.settings-dns-disclaimer {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .header__brand {
   display: flex;
   align-items: baseline;

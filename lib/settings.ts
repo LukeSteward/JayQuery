@@ -3,6 +3,9 @@
 /** What drives red / good-vs-bad on the toolbar icon. */
 export type ToolbarIconDriver = 'combined' | 'spf' | 'dmarc' | 'dkim';
 
+/** Primary DoH endpoint; JayQuery tries the alternate public resolver on failure / empty OK. */
+export type DnsProvider = 'google' | 'cloudflare';
+
 export type ExtensionSettings = {
   /** When true, update toolbar action icon with SPF/DMARC/DKIM segment colors. */
   coloredToolbarIcon: boolean;
@@ -16,6 +19,8 @@ export type ExtensionSettings = {
    * Otherwise only that pillar’s status controls the single toolbar glyph.
    */
   toolbarIconDriver: ToolbarIconDriver;
+  /** Which public DoH host is queried first (Google × Cloudflare). */
+  dnsProvider: DnsProvider;
 };
 
 const STORAGE_KEY = 'dnsHealthSettings';
@@ -33,10 +38,20 @@ function normalizeDriver(v: unknown): ToolbarIconDriver {
     : DEFAULT_SETTINGS.toolbarIconDriver;
 }
 
+const VALID_DNS_PROVIDERS: DnsProvider[] = ['google', 'cloudflare'];
+
+function normalizeDnsProvider(v: unknown): DnsProvider {
+  return typeof v === 'string' &&
+    VALID_DNS_PROVIDERS.includes(v as DnsProvider)
+    ? (v as DnsProvider)
+    : DEFAULT_SETTINGS.dnsProvider;
+}
+
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   coloredToolbarIcon: true,
   treatDnsResolutionErrorsAsFailure: true,
   toolbarIconDriver: 'combined',
+  dnsProvider: 'google',
 };
 
 export async function loadSettings(): Promise<ExtensionSettings> {
@@ -52,6 +67,7 @@ export async function loadSettings(): Promise<ExtensionSettings> {
         ? v.treatDnsResolutionErrorsAsFailure
         : DEFAULT_SETTINGS.treatDnsResolutionErrorsAsFailure,
     toolbarIconDriver: normalizeDriver(v?.toolbarIconDriver),
+    dnsProvider: normalizeDnsProvider(v?.dnsProvider),
   };
 }
 
