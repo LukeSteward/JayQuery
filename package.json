@@ -18,7 +18,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "tldts": "^7.0.29"
+    "tldts": "^7.0.30"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.40",
