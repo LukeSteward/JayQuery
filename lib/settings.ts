@@ -1,23 +1,26 @@
 /** Persisted extension preferences (browser.storage.local). */
 
-/** What drives red / good-vs-bad on the toolbar icon. */
-export type ToolbarIconDriver = 'combined' | 'spf' | 'dmarc' | 'dkim';
+/** Pillar rollup that drives pass/fail toolbar glyphs when the icon is not disabled. */
+export type ToolbarIconPillarDriver = 'combined' | 'spf' | 'dmarc' | 'dkim';
+
+/**
+ * Toolbar icon behavior: rollup or single pillar (`ToolbarIconPillarDriver`), or `disabled`
+ * for a neutral gray icon regardless of DNS result.
+ */
+export type ToolbarIconDriver = ToolbarIconPillarDriver | 'disabled';
 
 /** Primary DoH endpoint; JayQuery tries the alternate public resolver on failure / empty OK. */
 export type DnsProvider = 'google' | 'cloudflare';
 
 export type ExtensionSettings = {
-  /** When true, update toolbar action icon with SPF/DMARC/DKIM segment colors. */
-  coloredToolbarIcon: boolean;
   /**
    * When true, SERVFAIL / fetch errors etc. count as fail for email-auth pillars.
    * When false, treat like empty TXT (legacy ambiguous behavior).
    */
   treatDnsResolutionErrorsAsFailure: boolean;
   /**
-   * `combined`: one glyph rolled up from all three — green if all pass, amber if any warn
-   * but none fail/missing, red if any fail or missing.
-   * Otherwise only that pillar’s status controls the single toolbar glyph.
+   * Rollup (`combined`) or pillar-only glyph (`spf`/`dmarc`/`dkim`), or `disabled` for a
+   * neutral toolbar icon with no status glyphs.
    */
   toolbarIconDriver: ToolbarIconDriver;
   /** Which public DoH host is queried first (Google × Cloudflare). */
@@ -33,17 +36,33 @@ const STORAGE_KEY = 'jayquerySettings';
 /** Previous key; migrated on load so upgrades keep preferences. */
 const LEGACY_STORAGE_KEY = 'dnsHealthSettings';
 
-const VALID_DRIVERS: ToolbarIconDriver[] = [
+const VALID_PILLARS: ToolbarIconPillarDriver[] = [
   'combined',
   'spf',
   'dmarc',
   'dkim',
 ];
 
-function normalizeDriver(v: unknown): ToolbarIconDriver {
-  return typeof v === 'string' && VALID_DRIVERS.includes(v as ToolbarIconDriver)
-    ? (v as ToolbarIconDriver)
-    : DEFAULT_SETTINGS.toolbarIconDriver;
+function normalizePillar(v: unknown): ToolbarIconPillarDriver {
+  return typeof v === 'string' &&
+    VALID_PILLARS.includes(v as ToolbarIconPillarDriver)
+    ? (v as ToolbarIconPillarDriver)
+    : 'combined';
+}
+
+/** Raw storage may include removed `coloredToolbarIcon`; normalize that into `disabled`. */
+function normalizeToolbarIconDriver(raw: unknown): ToolbarIconDriver {
+  if (raw == null || typeof raw !== 'object') {
+    return DEFAULT_SETTINGS.toolbarIconDriver;
+  }
+  const v = raw as Record<string, unknown>;
+  const stored = v.toolbarIconDriver;
+  if (stored === 'disabled') return 'disabled';
+  const pillar = normalizePillar(stored);
+  if (v.coloredToolbarIcon === false) {
+    return 'disabled';
+  }
+  return pillar;
 }
 
 const VALID_DNS_PROVIDERS: DnsProvider[] = ['google', 'cloudflare'];
@@ -56,7 +75,6 @@ function normalizeDnsProvider(v: unknown): DnsProvider {
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  coloredToolbarIcon: true,
   treatDnsResolutionErrorsAsFailure: true,
   toolbarIconDriver: 'combined',
   dnsProvider: 'google',
@@ -69,15 +87,11 @@ export async function loadSettings(): Promise<ExtensionSettings> {
     | Partial<ExtensionSettings>
     | undefined;
   const next: ExtensionSettings = {
-    coloredToolbarIcon:
-      typeof v?.coloredToolbarIcon === 'boolean'
-        ? v.coloredToolbarIcon
-        : DEFAULT_SETTINGS.coloredToolbarIcon,
     treatDnsResolutionErrorsAsFailure:
       typeof v?.treatDnsResolutionErrorsAsFailure === 'boolean'
         ? v.treatDnsResolutionErrorsAsFailure
         : DEFAULT_SETTINGS.treatDnsResolutionErrorsAsFailure,
-    toolbarIconDriver: normalizeDriver(v?.toolbarIconDriver),
+    toolbarIconDriver: normalizeToolbarIconDriver(v),
     dnsProvider: normalizeDnsProvider(v?.dnsProvider),
     detailedBreakdown:
       typeof v?.detailedBreakdown === 'boolean'

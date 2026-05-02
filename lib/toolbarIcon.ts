@@ -1,6 +1,6 @@
 import type { FullScore } from '@/lib/score';
 import type { HealthStatus } from '@/lib/score/common';
-import type { ToolbarIconDriver } from '@/lib/settings';
+import type { ToolbarIconPillarDriver } from '@/lib/settings';
 import { combinedToolbarRollupStatus } from '@/lib/toolbarIconCombinedRollup';
 import {
   rasterNeutralToolbarToImageData,
@@ -64,7 +64,7 @@ function buildSingleToolbarSvg(
 
 export function toolbarIconSvgForScore(
   full: FullScore,
-  driver: ToolbarIconDriver,
+  driver: ToolbarIconPillarDriver,
 ): string {
   if (driver === 'combined') {
     return buildCombinedToolbarSvg(full);
@@ -96,7 +96,7 @@ async function applyPackagedFallbackIcon(tabId: number): Promise<void> {
 
 export async function toolbarIconImageDataForScore(
   full: FullScore,
-  driver: ToolbarIconDriver,
+  driver: ToolbarIconPillarDriver,
 ): Promise<{ '16': ImageData; '32': ImageData }> {
   const i16 = rasterToolbarScoreToImageData(full, driver, 16);
   const i32 = rasterToolbarScoreToImageData(full, driver, 32);
@@ -116,7 +116,7 @@ export async function toolbarIconNeutralImageData(): Promise<{
 export async function applyToolbarIconForTab(
   tabId: number,
   full: FullScore,
-  driver: ToolbarIconDriver,
+  driver: ToolbarIconPillarDriver,
 ): Promise<void> {
   try {
     const imageData = await toolbarIconImageDataForScore(full, driver);

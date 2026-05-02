@@ -66,15 +66,15 @@ function shellWithFabFooterOnly(bodyHtml: string): string {
 
 async function syncToolbarIconFromResult(result: CheckResult): Promise<void> {
   if (activeTabId == null) return;
-  if (settings.coloredToolbarIcon) {
-    await applyToolbarIconForTab(
-      activeTabId,
-      result.full,
-      settings.toolbarIconDriver,
-    );
-  } else {
+  if (settings.toolbarIconDriver === 'disabled') {
     await resetToolbarIconForTab(activeTabId);
+    return;
   }
+  await applyToolbarIconForTab(
+    activeTabId,
+    result.full,
+    settings.toolbarIconDriver,
+  );
 }
 
 async function clearToolbarIconIfPossible(): Promise<void> {
@@ -549,13 +549,6 @@ function renderSettings(): void {
       <div class="settings-body">
         <label class="settings-row">
           <span class="settings-row__text">
-            <strong>Colored toolbar icon</strong>
-            <span class="settings-row__hint">Good (check) / bad (X) glyphs from SPF, DMARC, and DKIM. Turn off to use a neutral gray icon.</span>
-          </span>
-          <input type="checkbox" id="setting-colored-icon" ${settings.coloredToolbarIcon ? 'checked' : ''} />
-        </label>
-        <label class="settings-row">
-          <span class="settings-row__text">
             <strong>Detailed breakdown</strong>
             <span class="settings-row__hint">Show all grading bullets when a check passes; when off, only warnings and issues are listed.</span>
           </span>
@@ -563,7 +556,7 @@ function renderSettings(): void {
         </label>
         <fieldset class="settings-fieldset">
           <legend class="settings-fieldset__legend">Toolbar icon driver</legend>
-          <p class="settings-fieldset__hint">Choose which result drives the icon, or use the default rollup of all three pillars.</p>
+          <p class="settings-fieldset__hint">Choose which result drives the colored pass/fail glyph, rollup all three pillars, or use a neutral gray icon.</p>
           <label class="settings-radio">
             <input type="radio" name="toolbar-icon-driver" value="combined" ${settings.toolbarIconDriver === 'combined' ? 'checked' : ''} />
             <span><strong>Combined</strong> — one icon: green all pass, amber if any warning (still present), red if any fail or missing</span>
@@ -580,18 +573,22 @@ function renderSettings(): void {
             <input type="radio" name="toolbar-icon-driver" value="dkim" ${settings.toolbarIconDriver === 'dkim' ? 'checked' : ''} />
             <span><strong>DKIM only</strong></span>
           </label>
+          <label class="settings-radio">
+            <input type="radio" name="toolbar-icon-driver" value="disabled" ${settings.toolbarIconDriver === 'disabled' ? 'checked' : ''} />
+            <span><strong>Disabled</strong> — neutral gray icon (no pass/fail glyphs)</span>
+          </label>
         </fieldset>
-        <label class="settings-row">
-          <span class="settings-row__text">
-            <strong>Treat DNS resolution errors as failure</strong>
-            <span class="settings-row__hint">When off, SERVFAIL and lookup errors are treated like empty TXT (older behavior).</span>
-          </span>
-          <input type="checkbox" id="setting-dns-errors-fail" ${settings.treatDnsResolutionErrorsAsFailure ? 'checked' : ''} />
-        </label>
 
         <details class="settings-advanced">
           <summary class="settings-advanced__summary">Advanced</summary>
           <div class="settings-advanced__inner">
+            <label class="settings-row">
+              <span class="settings-row__text">
+                <strong>Treat DNS resolution errors as failure</strong>
+                <span class="settings-row__hint">When off, SERVFAIL and lookup errors are treated like empty TXT (older behavior).</span>
+              </span>
+              <input type="checkbox" id="setting-dns-errors-fail" ${settings.treatDnsResolutionErrorsAsFailure ? 'checked' : ''} />
+            </label>
             <fieldset class="settings-fieldset settings-fieldset--in-advanced">
               <legend class="settings-fieldset__legend">DNS-over-HTTPS</legend>
               <p class="settings-fieldset__hint">Primary resolver. On fetch failure or an empty OK response JayQuery retries with the alternate public resolver (Google and Cloudflare).</p>
@@ -619,15 +616,6 @@ function renderSettings(): void {
     } else {
       void runCheck(lastMode);
     }
-  });
-
-  const colored = document.getElementById(
-    'setting-colored-icon',
-  ) as HTMLInputElement | null;
-  colored?.addEventListener('change', () => {
-    void persistSettingsAndRefresh({
-      coloredToolbarIcon: colored.checked,
-    });
   });
 
   const dnsFail = document.getElementById(
@@ -698,10 +686,7 @@ function partialNeedsDnsRefresh(partial: Partial<ExtensionSettings>): boolean {
 function partialAffectsToolbarIcon(
   partial: Partial<ExtensionSettings>,
 ): boolean {
-  return (
-    partial.coloredToolbarIcon !== undefined ||
-    partial.toolbarIconDriver !== undefined
-  );
+  return partial.toolbarIconDriver !== undefined;
 }
 
 async function persistSettingsAndRefresh(

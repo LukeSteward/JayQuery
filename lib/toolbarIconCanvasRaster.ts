@@ -1,6 +1,6 @@
 import type { FullScore } from '@/lib/score';
 import type { HealthStatus } from '@/lib/score/common';
-import type { ToolbarIconDriver } from '@/lib/settings';
+import type { ToolbarIconPillarDriver } from '@/lib/settings';
 import { combinedToolbarRollupStatus } from '@/lib/toolbarIconCombinedRollup';
 
 type DrawCtx = OffscreenCanvasRenderingContext2D;
@@ -86,7 +86,7 @@ function drawGlyphForStatus(
 function drawToolbarScoreOnContext(
   ctx: DrawCtx,
   full: FullScore,
-  driver: ToolbarIconDriver,
+  driver: ToolbarIconPillarDriver,
 ): void {
   if (driver === 'combined') {
     drawGlyphForStatus(
@@ -109,7 +109,7 @@ function canvasForToolbarIcon(sizePx: number): OffscreenCanvas {
 /** Stroke-only toolbar glyphs matching the SVG layout (works in MV3 service workers). */
 export function rasterToolbarScoreToImageData(
   full: FullScore,
-  driver: ToolbarIconDriver,
+  driver: ToolbarIconPillarDriver,
   sizePx: number,
 ): ImageData {
   const canvas = canvasForToolbarIcon(sizePx);

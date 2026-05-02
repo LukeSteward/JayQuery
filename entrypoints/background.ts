@@ -22,7 +22,7 @@ async function reapplyCachedToolbarIcon(tabId: number): Promise<void> {
     return;
   }
   const settings = await loadSettings();
-  if (!settings.coloredToolbarIcon) {
+  if (settings.toolbarIconDriver === 'disabled') {
     await resetToolbarIconForTab(tabId);
     return;
   }
@@ -44,7 +44,7 @@ async function refreshToolbarIconForTab(
   token: number,
 ): Promise<void> {
   const settings = await loadSettings();
-  if (!settings.coloredToolbarIcon) {
+  if (settings.toolbarIconDriver === 'disabled') {
     if (toolbarRefreshGenByTabId.get(tabId) !== token) {
       return;
     }
