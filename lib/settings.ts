@@ -15,7 +15,8 @@ export type ExtensionSettings = {
    */
   treatDnsResolutionErrorsAsFailure: boolean;
   /**
-   * `combined`: three columns (SPF | DMARC | DKIM), each with good/bad (or warn) glyph.
+   * `combined`: one glyph rolled up from all three — green if all pass, amber if any warn
+   * but none fail/missing, red if any fail or missing.
    * Otherwise only that pillar’s status controls the single toolbar glyph.
    */
   toolbarIconDriver: ToolbarIconDriver;

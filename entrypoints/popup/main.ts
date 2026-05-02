@@ -559,10 +559,10 @@ function renderSettings(): void {
         </label>
         <fieldset class="settings-fieldset">
           <legend class="settings-fieldset__legend">Toolbar icon driver</legend>
-          <p class="settings-fieldset__hint">Choose which result turns the icon red/green, or keep the default three-column view.</p>
+          <p class="settings-fieldset__hint">Choose which result drives the icon, or use the default rollup of all three pillars.</p>
           <label class="settings-radio">
             <input type="radio" name="toolbar-icon-driver" value="combined" ${settings.toolbarIconDriver === 'combined' ? 'checked' : ''} />
-            <span><strong>Combined</strong> — SPF, DMARC, and DKIM (one glyph each)</span>
+            <span><strong>Combined</strong> — one icon: green all pass, amber if any warning (still present), red if any fail or missing</span>
           </label>
           <label class="settings-radio">
             <input type="radio" name="toolbar-icon-driver" value="spf" ${settings.toolbarIconDriver === 'spf' ? 'checked' : ''} />

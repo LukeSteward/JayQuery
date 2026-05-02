@@ -1,6 +1,7 @@
 import type { FullScore } from '@/lib/score';
 import type { HealthStatus } from '@/lib/score/common';
 import type { ToolbarIconDriver } from '@/lib/settings';
+import { combinedToolbarRollupStatus } from '@/lib/toolbarIconCombinedRollup';
 import {
   rasterNeutralToolbarToImageData,
   rasterToolbarScoreToImageData,
@@ -35,7 +36,6 @@ function svgGlyphBad(
 }
 
 const SINGLE_GLYPH_RADIUS = 9.35;
-const COMBINED_COLUMN_RADIUS = 3.72;
 
 /** Pass → green good; warn → amber good (same glyph); fail/missing → red bad. */
 function glyphMarkupForStatus(status: HealthStatus): string {
@@ -49,23 +49,8 @@ function glyphMarkupForStatus(status: HealthStatus): string {
   return svgGlyphBad(12, 12, '#f07178', rad);
 }
 
-function glyphMarkupForColumn(status: HealthStatus, cx: number, cy: number): string {
-  const rad = COMBINED_COLUMN_RADIUS;
-  if (status === 'pass') {
-    return svgGlyphGood(cx, cy, '#3dd68c', rad);
-  }
-  if (status === 'warn') {
-    return svgGlyphGood(cx, cy, '#e6b84a', rad);
-  }
-  return svgGlyphBad(cx, cy, '#f07178', rad);
-}
-
 function buildCombinedToolbarSvg(full: FullScore): string {
-  const cy = 12;
-  const cols = [full.spf.status, full.dmarc.status, full.dkim.status];
-  const inner = cols
-    .map((st, i) => glyphMarkupForColumn(st, 4 + i * 8, cy))
-    .join('');
+  const inner = glyphMarkupForStatus(combinedToolbarRollupStatus(full));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${inner}</svg>`;
 }
 

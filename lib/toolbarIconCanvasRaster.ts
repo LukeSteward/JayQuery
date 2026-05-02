@@ -1,11 +1,11 @@
 import type { FullScore } from '@/lib/score';
 import type { HealthStatus } from '@/lib/score/common';
 import type { ToolbarIconDriver } from '@/lib/settings';
+import { combinedToolbarRollupStatus } from '@/lib/toolbarIconCombinedRollup';
 
 type DrawCtx = OffscreenCanvasRenderingContext2D;
 
 const SINGLE_GLYPH_RADIUS = 9.35;
-const COMBINED_COLUMN_RADIUS = 3.72;
 
 function strokeWidthForCircleRadius(radius: number): number {
   return Math.max(1.15, radius * 0.16);
@@ -89,17 +89,13 @@ function drawToolbarScoreOnContext(
   driver: ToolbarIconDriver,
 ): void {
   if (driver === 'combined') {
-    const cy = 12;
-    const cols = [full.spf.status, full.dmarc.status, full.dkim.status];
-    cols.forEach((st, i) => {
-      drawGlyphForStatus(
-        ctx,
-        4 + i * 8,
-        cy,
-        st,
-        COMBINED_COLUMN_RADIUS,
-      );
-    });
+    drawGlyphForStatus(
+      ctx,
+      12,
+      12,
+      combinedToolbarRollupStatus(full),
+      SINGLE_GLYPH_RADIUS,
+    );
     return;
   }
 
