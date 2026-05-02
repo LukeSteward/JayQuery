@@ -310,10 +310,19 @@ function renderProtocolCard(
     ? `<details class="raw"><summary>${rawLabel}</summary><pre class="raw__pre">${escapeHtml(truncate(rawSnippet, 900))}</pre></details>`
     : '';
   const titleHtml = titleInfoTitle
-    ? `<div class="card__title-group">
+    ? (() => {
+        const tipId = `card-info-tip-${title
+          .replace(/[^a-z0-9]+/gi, '-')
+          .toLowerCase()
+          .replace(/^-|-$/g, '')}`;
+        return `<div class="card__title-group">
         <h3 class="card__title">${title}</h3>
-        <button type="button" class="card__info" title="${escapeHtml(titleInfoTitle)}" aria-label="${escapeHtml(titleInfoTitle)}">?</button>
-      </div>`
+        <span class="card__info-wrap">
+          <button type="button" class="card__info" aria-describedby="${tipId}" aria-label="Help: ${escapeHtml(title)} lookup scope">?</button>
+          <span id="${tipId}" role="tooltip" class="card__info-tooltip">${escapeHtml(titleInfoTitle)}</span>
+        </span>
+      </div>`;
+      })()
     : `<h3 class="card__title">${title}</h3>`;
   return `
     <article class="card">
