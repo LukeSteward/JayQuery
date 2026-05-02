@@ -114,16 +114,59 @@ describe('checkM365Tenant', () => {
     }
   });
 
-  it('reports warn with Entra messaging for HTTP 400', async () => {
+  it('reports missing with Entra messaging for HTTP 400', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(null, { status: 400 })),
     );
     try {
       const r = await checkM365Tenant('consumer-domain.example');
-      expect(r.status).toBe('warn');
+      expect(r.status).toBe('missing');
       expect(r.summary).toBe('TenantID not found, domain not on EntraID');
       expect(r.lines).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reports missing with Entra messaging for HTTP 403', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 403 })),
+    );
+    try {
+      const r = await checkM365Tenant('consumer-domain.example');
+      expect(r.status).toBe('missing');
+      expect(r.summary).toBe('TenantID not found, domain not on EntraID');
+      expect(r.lines.some((l) => l.includes('403'))).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reports missing when JSON parse fails on OK response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('not-json', { status: 200 })),
+    );
+    try {
+      const r = await checkM365Tenant('example.com');
+      expect(r.status).toBe('missing');
+      expect(r.summary).toBe('Not JSON');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reports warn for HTTP 429 only', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 429 })),
+    );
+    try {
+      const r = await checkM365Tenant('example.com');
+      expect(r.status).toBe('warn');
+      expect(r.summary).toBe('Too many requests');
     } finally {
       vi.unstubAllGlobals();
     }

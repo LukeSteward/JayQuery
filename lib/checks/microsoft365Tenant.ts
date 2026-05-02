@@ -129,20 +129,40 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
     return {
       id: 'm365Tenant',
       title: 'Entra tenant (OIDC Check)',
-      status: 'warn',
+      status: 'missing',
       summary: 'TenantID not found, domain not on EntraID',
       lines: [],
     };
   }
 
   if (!response.ok) {
+    if (response.status >= 500) {
+      return {
+        id: 'm365Tenant',
+        title: 'Entra tenant (OIDC Check)',
+        status: 'fail',
+        summary: `HTTP ${response.status}`,
+        lines: [
+          `Discovery request returned HTTP ${response.status} — tenant ID could not be read.`,
+        ],
+      };
+    }
+    if (response.status === 429) {
+      return {
+        id: 'm365Tenant',
+        title: 'Entra tenant (OIDC Check)',
+        status: 'warn',
+        summary: 'Too many requests',
+        lines: ['Discovery endpoint returned HTTP 429 — try again later.'],
+      };
+    }
     return {
       id: 'm365Tenant',
       title: 'Entra tenant (OIDC Check)',
-      status: response.status >= 500 ? 'fail' : 'warn',
-      summary: `HTTP ${response.status}`,
+      status: 'missing',
+      summary: 'TenantID not found, domain not on EntraID',
       lines: [
-        `Discovery request returned HTTP ${response.status} — tenant ID could not be read.`,
+        `Discovery returned HTTP ${response.status} — tenant ID could not be read.`,
       ],
     };
   }
@@ -154,7 +174,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
     return {
       id: 'm365Tenant',
       title: 'Entra tenant (OIDC Check)',
-      status: 'warn',
+      status: 'missing',
       summary: 'Not JSON',
       lines: ['Response was not JSON — cannot parse issuer or endpoints.'],
     };
@@ -165,7 +185,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
     return {
       id: 'm365Tenant',
       title: 'Entra tenant (OIDC Check)',
-      status: 'warn',
+      status: 'missing',
       summary: 'Invalid payload',
       lines: ['OIDC document was not an object.'],
     };

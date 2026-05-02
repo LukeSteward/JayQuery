@@ -262,7 +262,7 @@ function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
     return {
       id: 'dnssec',
       title: 'DNSSEC',
-      status: 'fail',
+      status: 'missing',
       summary: 'Not enabled',
       lines: [DNSSEC_NO_DNSKEY_DETAIL_TEXT],
     };

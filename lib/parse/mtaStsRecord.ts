@@ -27,7 +27,7 @@ export function analyzeMtaStsTxt(txtRecords: string[]): MtaStsTxtAnalysis {
 
   if (recordCount === 0) {
     lines.push({
-      status: 'fail',
+      status: 'missing',
       text: MTA_STS_ABSENT_DETAIL_TEXT,
     });
     return {
