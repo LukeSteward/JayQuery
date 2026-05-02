@@ -19,6 +19,7 @@ import {
   TLS_RPT_ABSENT_DETAIL_TEXT,
 } from '@/lib/parse/tlsRptRecord';
 import { analyzeMxProviderGroup } from '@/lib/mailProviders/identifyMxProvider';
+import { analyzeNsProviderGroup } from '@/lib/nsProviders/identifyNsProvider';
 import type { HealthStatus } from '@/lib/score/common';
 
 export type MailInfraCheckOptions = Pick<DohResolveOptions, 'dnsProvider'>;
@@ -54,6 +55,10 @@ function foldSeverity(statuses: HealthStatus[]): HealthStatus {
 /** "1 MX record detected" vs "4 MX records detected". */
 function mxRecordsDetectedPhrase(n: number): string {
   return n === 1 ? '1 MX record detected' : `${n} MX records detected`;
+}
+
+function nsRecordsDetectedPhrase(n: number): string {
+  return n === 1 ? '1 NS record detected' : `${n} NS records detected`;
 }
 
 function isNullMx(mx: MxRecord[]): boolean {
@@ -165,19 +170,40 @@ async function checkNs(
     };
   }
   const status: HealthStatus = ns.length >= 2 ? 'pass' : 'warn';
-  const lines = [
-    `${ns.length} nameserver(s):`,
-    ...ns.slice(0, 8),
-  ];
-  if (ns.length > 8) lines.push(`… +${ns.length - 8} more`);
+
+  const { identified, allSameProvider } = analyzeNsProviderGroup(ns);
+
+  let lines: string[];
+  if (identified) {
+    lines = [nsRecordsDetectedPhrase(ns.length)];
+    if (!allSameProvider) {
+      lines.push(`Identified provider (NS): ${identified.name}`);
+    }
+  } else {
+    const label = ns.length === 1 ? '1 NS record.' : `${ns.length} NS records.`;
+    lines = [label, ...ns.slice(0, 8)];
+    if (ns.length > 8) lines.push(`… +${ns.length - 8} more`);
+    lines.push(
+      'NS host(s) did not match known DNS / hosting fingerprints (custom or unlisted provider).',
+    );
+  }
+
   if (ns.length === 1) {
     lines.push('Only one NS; redundancy is recommended.');
   }
+
+  const summary =
+    identified && allSameProvider
+      ? identified.name
+      : identified
+        ? `${ns.length} nameserver(s): ${identified.name}`
+        : `${ns.length} nameserver(s)`;
+
   return {
     id: 'ns',
     title: 'NS',
     status,
-    summary: `${ns.length} nameserver(s)`,
+    summary,
     lines,
     raw: ns.join('\n'),
   };
