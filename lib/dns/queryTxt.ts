@@ -1,5 +1,5 @@
 /**
- * DNS-over-HTTPS TXT resolution (Google-first or Cloudflare-first + fallback — see lib/dns/dohJson).
+ * DNS-over-HTTPS TXT resolution (Google-first or Cloudflare-first + fallback; see lib/dns/dohJson).
  */
 
 import {

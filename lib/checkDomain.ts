@@ -48,12 +48,12 @@ export type CheckResult = {
   spfBreakdown: GradeLine[];
   dmarcBreakdown: GradeLine[];
   dkimBreakdown: GradeLine[];
-  /** MX, NS, MTA-STS TXT, TLS-RPT, DNSSEC — organizational domain (DNSHealth-style). */
+  /** MX, NS, MTA-STS TXT, TLS-RPT, DNSSEC at organisational domain (DNSHealth-style). */
   mailInfra: MailInfraCheck[];
   /** True when that pillar hit non-definitive DNS and strict mode applied. */
   emailAuthDnsError: { spf: boolean; dmarc: boolean; dkim: boolean };
   /**
-   * Inbound MX provider SPF include check at the organizational domain — informational only;
+   * Inbound MX provider SPF include check at the organisational domain; informational only;
    * does not change {@link CheckResult.full} scores.
    */
   spfMailProviderHint?: SpfMailProviderHint;
@@ -87,7 +87,7 @@ const DNS_FAIL_DKIM: GradeLine[] = [
   },
 ];
 
-/** SPF/DKIM query target + DMARC organizational domain (from tab host). */
+/** SPF/DKIM query target + DMARC organisational domain (from tab host). */
 export function resolveCheckTargets(
   tabHostname: string,
   mode: CheckMode,

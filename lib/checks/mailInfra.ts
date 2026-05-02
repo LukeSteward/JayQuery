@@ -28,11 +28,11 @@ export type MailInfraCheck = {
   status: HealthStatus;
   summary: string;
   lines: string[];
-  /** Entra OIDC pass — rendered as TenantID + copy control in the popup. */
+  /** Entra OIDC pass; rendered as TenantID + copy control in the popup. */
   tenantDirectoryId?: string;
   raw?: string;
   /**
-   * When MX matched a known profile — used only to build the informational SPF supplement
+   * When MX matched a known profile: used only to build the informational SPF supplement
    * on the main SPF card (no scoring).
    */
   providerProfile?: {
@@ -79,7 +79,7 @@ async function checkMx(
       title: 'MX',
       status: 'pass',
       summary: 'Null MX (no inbound mail)',
-      lines: ['Null MX present — domain should not receive SMTP.'],
+      lines: ['Null MX present; domain should not receive SMTP.'],
       raw: '0 .',
     };
   }
@@ -116,7 +116,7 @@ async function checkMx(
     identified && allSameProvider
       ? identified.name
       : identified
-        ? `${mx.length} mail exchanger(s) — ${identified.name}`
+        ? `${mx.length} mail exchanger(s): ${identified.name}`
         : `${mx.length} mail exchanger(s)`;
 
   const providerProfile = identified
@@ -160,7 +160,7 @@ async function checkNs(
   ];
   if (ns.length > 8) lines.push(`… +${ns.length - 8} more`);
   if (ns.length === 1) {
-    lines.push('Only one NS — redundancy is recommended.');
+    lines.push('Only one NS; redundancy is recommended.');
   }
   return {
     id: 'ns',
@@ -218,9 +218,9 @@ async function checkTlsRpt(
   };
 }
 
-/** Shown when apex has no DNSKEY — also filtered from bullets when Detailed breakdown is off. */
+/** Shown when apex has no DNSKEY; also filtered from bullets when Detailed breakdown is off. */
 export const DNSSEC_NO_DNSKEY_DETAIL_TEXT =
-  'No DNSKEY records — DNSSEC not enabled (or wrong query name).';
+  'No DNSKEY records; DNSSEC not enabled (or wrong query name).';
 
 const MAIL_INFRA_LINES_HIDDEN_WHEN_COMPACT = new Set<string>([
   MTA_STS_ABSENT_DETAIL_TEXT,
@@ -254,7 +254,7 @@ function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
       title: 'DNSSEC',
       status: 'fail',
       summary: 'Zone not found',
-      lines: [`NXDOMAIN for ${domain} — cannot assess DNSKEY.`],
+      lines: [`NXDOMAIN for ${domain}; cannot assess DNSKEY.`],
     };
   }
 
@@ -270,7 +270,7 @@ function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
 
   const lines: string[] = [`${keyAnswers.length} DNSKEY RR(s) returned.`];
   if (r.ad) {
-    lines.push('AD=true — response validated by this DoH resolver.');
+    lines.push('AD=true; response validated by this DoH resolver.');
     return {
       id: 'dnssec',
       title: 'DNSSEC',
@@ -281,7 +281,7 @@ function interpretDnssec(r: DohResult, domain: string): MailInfraCheck {
   }
 
   lines.push(
-    'AD=false — keys present but response not AD-validated here (Test-DNSSEC style check).',
+    'AD=false; keys present but response not AD-validated here (Test-DNSSEC style check).',
   );
   return {
     id: 'dnssec',
@@ -306,7 +306,7 @@ async function checkDnssec(
 
 /**
  * Extra checks similar to [DNSHealth](https://github.com/johnduprey/DNSHealth/) (MX, NS, MTA-STS TXT, TLS-RPT, Test-DNSSEC).
- * All use the organizational `mailDomain`.
+ * All use the organisational `mailDomain`.
  */
 export async function runMailInfraChecks(
   mailDomain: string,

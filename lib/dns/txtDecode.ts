@@ -1,7 +1,7 @@
 /**
  * Decode TXT RDATA from DoH JSON (DNS master-file presentation).
  * A TXT RR may contain several character strings; concatenation uses no delimiter
- * (RFC 1035 — same logical TXT record).
+ * (RFC 1035: same logical TXT record).
  *
  * Google's DoH often returns one pre-joined string; Cloudflare's JSON returns multiple
  * quoted `"…"` chunks in `data`. Stripping only the outermost quotes breaks DMARC parsing.

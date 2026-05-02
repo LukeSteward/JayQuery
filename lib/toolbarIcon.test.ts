@@ -82,7 +82,7 @@ describe('toolbarIconSvgForScore', () => {
     expect(svgDkim).toContain('#e6b84a');
   });
 
-  it('fail status uses bad glyph stroke color', () => {
+  it('fail status uses bad glyph stroke colour', () => {
     const onlyFail: FullScore = {
       ...sample,
       spf: { points: 0, max: 3, status: 'fail', detail: 'n' },

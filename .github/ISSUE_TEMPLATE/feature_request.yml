@@ -19,7 +19,7 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
-      description: How you imagine this working (behavior, UX, APIs), even at a high level.
+      description: How you imagine this working (behaviour, UX, APIs), even at a high level.
     validations:
       required: true
 

@@ -116,14 +116,14 @@ function mxtoolboxEmailHealthUrl(domain: string): string {
 }
 
 const DNS_TECHNIQUE_DISCLOSURE =
-  'DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only — no MTA-STS policy files or cert inspection. DKIM uses common selectors only.';
+  'DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only; no MTA-STS policy files or cert inspection. DKIM uses common selectors only.';
 
 const WALL_OF_SHAME_REPO = 'jkerai1/DMARC-WallOfShame';
 
 
 function wallOfShameNewIssueUrl(company: string, result: CheckResult): string {
   const domain = result.dmarcLookupHost;
-  const title = `${company} — ${domain}`;
+  const title = `${company} (${domain})`;
   const bodyParts = [
     `**Company:** ${company}`,
     `**Domain:** ${domain}`,
@@ -172,7 +172,7 @@ function renderCastShameModal(result: CheckResult): string {
         <h2 class="cast-shame-modal__title" id="cast-shame-heading">Submit to DMARC wall of Shame</h2>
         <p class="cast-shame-modal__lede">Please submit the company name for the DMARC issue.</p>
         <label class="cast-shame-modal__label" for="cast-shame-company">Company name</label>
-        <input type="text" class="cast-shame-modal__input" id="cast-shame-company" autocomplete="organization" maxlength="160" placeholder="e.g. Acme Corp" />
+        <input type="text" class="cast-shame-modal__input" id="cast-shame-company" autocomplete="organization" maxlength="160" placeholder="e.g. Acme Ltd" />
         <p class="cast-shame-modal__error" id="cast-shame-error" hidden role="alert">Enter a company name.</p>
         <div class="cast-shame-modal__actions">
           <button type="button" class="cast-shame-modal__btn cast-shame-modal__btn--ghost" id="cast-shame-cancel">Cancel</button>
@@ -284,7 +284,7 @@ function renderSpfMailProviderHint(h: SpfMailProviderHint): string {
     : '';
   return `
     <div class="spf-provider-hint" role="note" aria-label="MX provider SPF reference (not scored)">
-      <p class="spf-provider-hint__kicker">MX provider profile — not part of score</p>
+      <p class="spf-provider-hint__kicker">MX provider profile (not part of score)</p>
       <div class="spf-provider-hint__head">
         <span class="spf-provider-hint__provider">${escapeHtml(h.providerName)}</span>
         <span class="${badgeClass(h.status)}">${statusLabel(h.status)}</span>
@@ -452,7 +452,7 @@ function renderMailInfraCard(
 }
 
 function dmarcHint(result: CheckResult): string {
-  return `DMARC is always read from _dmarc.${result.dmarcLookupHost} (organizational domain of the tab). SPF and DKIM use ${result.queryHostname}.`;
+  return `DMARC is always read from _dmarc.${result.dmarcLookupHost} (organisational domain of the tab). SPF and DKIM use ${result.queryHostname}.`;
 }
 
 function renderResult(result: CheckResult): void {
@@ -556,10 +556,10 @@ function renderSettings(): void {
         </label>
         <fieldset class="settings-fieldset">
           <legend class="settings-fieldset__legend">Toolbar icon driver</legend>
-          <p class="settings-fieldset__hint">Choose which result drives the colored pass/fail glyph, rollup all three pillars, or use a neutral gray icon.</p>
+          <p class="settings-fieldset__hint">Choose which result drives the coloured pass/fail glyph, rollup all three pillars, or use a neutral grey icon.</p>
           <label class="settings-radio">
             <input type="radio" name="toolbar-icon-driver" value="combined" ${settings.toolbarIconDriver === 'combined' ? 'checked' : ''} />
-            <span><strong>Combined</strong> — one icon: green all pass, amber if any warning (still present), red if any fail or missing</span>
+            <span><strong>Combined</strong>: one icon: green all pass, amber if any warning (still present), red if any fail or missing</span>
           </label>
           <label class="settings-radio">
             <input type="radio" name="toolbar-icon-driver" value="spf" ${settings.toolbarIconDriver === 'spf' ? 'checked' : ''} />
@@ -575,7 +575,7 @@ function renderSettings(): void {
           </label>
           <label class="settings-radio">
             <input type="radio" name="toolbar-icon-driver" value="disabled" ${settings.toolbarIconDriver === 'disabled' ? 'checked' : ''} />
-            <span><strong>Disabled</strong> — neutral gray icon (no pass/fail glyphs)</span>
+            <span><strong>Disabled</strong>: neutral grey icon (no pass/fail glyphs)</span>
           </label>
         </fieldset>
 
@@ -585,7 +585,7 @@ function renderSettings(): void {
             <label class="settings-row">
               <span class="settings-row__text">
                 <strong>Treat DNS resolution errors as failure</strong>
-                <span class="settings-row__hint">When off, SERVFAIL and lookup errors are treated like empty TXT (older behavior).</span>
+                <span class="settings-row__hint">When off, SERVFAIL and lookup errors are treated like empty TXT (older behaviour).</span>
               </span>
               <input type="checkbox" id="setting-dns-errors-fail" ${settings.treatDnsResolutionErrorsAsFailure ? 'checked' : ''} />
             </label>
@@ -594,11 +594,11 @@ function renderSettings(): void {
               <p class="settings-fieldset__hint">Primary resolver. On fetch failure or an empty OK response JayQuery retries with the alternate public resolver (Google and Cloudflare).</p>
               <label class="settings-radio">
                 <input type="radio" name="dns-provider" value="google" ${settings.dnsProvider === 'google' ? 'checked' : ''} />
-                <span><strong>Google</strong> — query Google DNS first</span>
+                <span><strong>Google</strong>: query Google DNS first</span>
               </label>
               <label class="settings-radio">
                 <input type="radio" name="dns-provider" value="cloudflare" ${settings.dnsProvider === 'cloudflare' ? 'checked' : ''} />
-                <span><strong>Cloudflare</strong> — query Cloudflare first</span>
+                <span><strong>Cloudflare</strong>: query Cloudflare DNS first</span>
               </label>
             </fieldset>
             <p class="settings-dns-disclaimer">${escapeHtml(DNS_TECHNIQUE_DISCLOSURE)}</p>

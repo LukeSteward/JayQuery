@@ -10,7 +10,7 @@ export type GradeLine = {
   text: string;
 };
 
-/** DKIM missing breakdown — omitted when Detailed breakdown is off (card summary still shows). */
+/** DKIM missing breakdown; omitted when Detailed breakdown is off (card summary still shows). */
 export const DKIM_ABSENT_PROBE_DETAIL_TEXT =
   'No DKIM DNS record at any probed selector.';
 
@@ -39,7 +39,7 @@ export function buildSpfBreakdown(a: SpfAnalysis): GradeLine[] {
   if (a.multipleRecords) {
     lines.push({
       status: 'fail',
-      text: 'Multiple SPF records — only one is valid per RFC 7208.',
+      text: 'Multiple SPF records; only one is valid per RFC 7208.',
     });
   } else {
     lines.push({ status: 'pass', text: 'Single SPF record.' });
@@ -47,7 +47,7 @@ export function buildSpfBreakdown(a: SpfAnalysis): GradeLine[] {
   if (a.openAll) {
     lines.push({
       status: 'fail',
-      text: '+all (or bare all) allows any sender — not acceptable.',
+      text: '+all (or bare all) allows any sender; not acceptable.',
     });
   } else {
     lines.push({ status: 'pass', text: 'Not using permissive +all.' });
@@ -60,7 +60,7 @@ export function buildSpfBreakdown(a: SpfAnalysis): GradeLine[] {
   } else {
     lines.push({
       status: 'info',
-      text: `~${a.lookupApprox} mechanisms counted toward the 10 lookup cap.`,
+      text: `~${a.lookupApprox} mechanisms counted towards the 10 lookup cap.`,
     });
   }
   if (!a.openAll) {
@@ -92,7 +92,7 @@ export function buildSpfBreakdown(a: SpfAnalysis): GradeLine[] {
       default:
         lines.push({
           status: 'warn',
-          text: 'No explicit all mechanism — consider -all or ~all.',
+          text: 'No explicit all mechanism; consider -all or ~all.',
         });
     }
   }
@@ -118,7 +118,7 @@ export function buildDmarcBreakdown(
   if (a.multipleRecords) {
     lines.push({
       status: 'fail',
-      text: 'Multiple DMARC TXT records — only one is valid per RFC 7489.',
+      text: 'Multiple DMARC TXT records; only one is valid per RFC 7489.',
     });
     return lines;
   }
@@ -138,7 +138,7 @@ export function buildDmarcBreakdown(
     case 'none':
       lines.push({
         status: 'warn',
-        text: 'p=none (monitoring only — no enforcement).',
+        text: 'p=none (monitoring only; no enforcement).',
       });
       break;
     default:
@@ -161,7 +161,7 @@ export function buildDmarcBreakdown(
   } else {
     lines.push({
       status: 'warn',
-      text: 'No rua= — add aggregate report addresses.',
+      text: 'No rua=; add aggregate report addresses.',
     });
   }
   if (a.pct != null && a.pct < 100) {
@@ -225,7 +225,7 @@ export function buildDkimBreakdown(
     lines.push({
       status: d.hasVersion ? 'warn' : 'fail',
       text: d.hasVersion
-        ? 'p= is empty — key may be revoked.'
+        ? 'p= is empty; key may be revoked.'
         : 'No published public key (p=).',
     });
   } else {

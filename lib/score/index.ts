@@ -41,7 +41,7 @@ export function scoreSpf(a: SpfAnalysis): ProtocolScore {
       points: 0.5,
       max: SPF_MAX,
       status: 'fail',
-      detail: 'Multiple SPF TXT records found — only one is allowed.',
+      detail: 'Multiple SPF TXT records found; only one is allowed.',
     };
   }
 
@@ -109,7 +109,7 @@ export function scoreDmarc(a: DmarcAnalysis, dmarcHost: string): ProtocolScore {
       max: DMARC_MAX,
       status: 'fail',
       detail:
-        'Multiple DMARC TXT records found — only one is valid per RFC 7489.',
+        'Multiple DMARC TXT records found; only one is valid per RFC 7489.',
     };
   }
 

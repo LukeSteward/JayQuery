@@ -4,8 +4,8 @@
 export type ToolbarIconPillarDriver = 'combined' | 'spf' | 'dmarc' | 'dkim';
 
 /**
- * Toolbar icon behavior: rollup or single pillar (`ToolbarIconPillarDriver`), or `disabled`
- * for a neutral gray icon regardless of DNS result.
+ * Toolbar icon behaviour: rollup or single pillar (`ToolbarIconPillarDriver`), or `disabled`
+ * for a neutral grey icon regardless of DNS result.
  */
 export type ToolbarIconDriver = ToolbarIconPillarDriver | 'disabled';
 
@@ -15,7 +15,7 @@ export type DnsProvider = 'google' | 'cloudflare';
 export type ExtensionSettings = {
   /**
    * When true, SERVFAIL / fetch errors etc. count as fail for email-auth pillars.
-   * When false, treat like empty TXT (legacy ambiguous behavior).
+   * When false, treat like empty TXT (legacy ambiguous behaviour).
    */
   treatDnsResolutionErrorsAsFailure: boolean;
   /**
@@ -50,7 +50,7 @@ function normalizePillar(v: unknown): ToolbarIconPillarDriver {
     : 'combined';
 }
 
-/** Raw storage may include removed `coloredToolbarIcon`; normalize that into `disabled`. */
+/** Raw storage may include removed `coloredToolbarIcon`; normalise that into `disabled`. */
 function normalizeToolbarIconDriver(raw: unknown): ToolbarIconDriver {
   if (raw == null || typeof raw !== 'object') {
     return DEFAULT_SETTINGS.toolbarIconDriver;

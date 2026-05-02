@@ -9,9 +9,9 @@ import {
 } from '@/lib/toolbarIcon';
 
 const lastHostnameByTabId = new Map<number, string>();
-/** Latest successful graded icon scores (apex check) — reapplied after same-host navigations Chrome resets icons. */
+/** Latest successful graded icon scores (apex check); reapplied after same-host navigations Chrome resets icons. */
 const lastToolbarScoreByTabId = new Map<number, FullScore>();
-/** Previous fully loaded URL — same URL again at `complete` ⇒ reload heuristic. */
+/** Previous fully loaded URL; same URL again at `complete` ⇒ reload heuristic. */
 const lastCompleteUrlByTabId = new Map<number, string>();
 /** Per-tab generation; incremented at each refresh kick so stale async work skips setIcon. */
 const toolbarRefreshGenByTabId = new Map<number, number>();
@@ -107,7 +107,7 @@ function handleTabNavigationComplete(
     return;
   }
 
-  /** Same-host path/query change: Chromium clears per-tab toolbar artwork — repaint from cache without re-querying DNS. */
+  /** Same-host path/query change: Chromium clears per-tab toolbar artwork; repaint from cache without re-querying DNS. */
   if (last === hostname && lastToolbarScoreByTabId.has(tabId)) {
     void reapplyCachedToolbarIcon(tabId);
   }
@@ -126,7 +126,7 @@ async function refreshToolbarIconsForActiveTabsAlreadyOpen(): Promise<void> {
       handleTabNavigationComplete(id, url, 'link');
     }
   } catch {
-    /* ignore — best-effort hydrate */
+    /* ignore; best-effort hydrate */
   }
 }
 

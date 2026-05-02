@@ -31,7 +31,7 @@
 }
 
 /*
- * One scroll container only: <html>. Do not add overflow-y on #app or body —
+ * One scroll container only: <html>. Do not add overflow-y on #app or body;
  * Chrome’s action popup + nested overflow produced two scrollbars.
  */
 html {

@@ -125,7 +125,7 @@ export type MxProviderGrouping = {
 };
 
 /**
- * Whether all MX targets share one known provider (for simpler UX — no duplicate provider line).
+ * Whether all MX targets share one known provider (for simpler UX: no duplicate provider line).
  */
 export function analyzeMxProviderGroup(
   mx: MxRecord[],

@@ -92,7 +92,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
       title: 'Entra tenant (OIDC Check)',
       status: 'fail',
       summary: 'Invalid hostname',
-      lines: ['Mail domain failed hostname validation — cannot query Entra metadata.'],
+      lines: ['Mail domain failed hostname validation; cannot query Entra metadata.'],
     };
   }
 
@@ -120,7 +120,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
       status: 'missing',
       summary: 'No metadata (404)',
       lines: [
-        'No OIDC discovery document for this hostname — tenant may not exist or domain is not verified in Entra.',
+        'No OIDC discovery document for this hostname; tenant may not exist or domain is not verified in Entra.',
       ],
     };
   }
@@ -143,7 +143,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
         status: 'fail',
         summary: `HTTP ${response.status}`,
         lines: [
-          `Discovery request returned HTTP ${response.status} — tenant ID could not be read.`,
+          `Discovery request returned HTTP ${response.status}; tenant ID could not be read.`,
         ],
       };
     }
@@ -153,7 +153,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
         title: 'Entra tenant (OIDC Check)',
         status: 'warn',
         summary: 'Too many requests',
-        lines: ['Discovery endpoint returned HTTP 429 — try again later.'],
+        lines: ['Discovery endpoint returned HTTP 429; try again later.'],
       };
     }
     return {
@@ -162,7 +162,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
       status: 'missing',
       summary: 'TenantID not found, domain not on EntraID',
       lines: [
-        `Discovery returned HTTP ${response.status} — tenant ID could not be read.`,
+        `Discovery returned HTTP ${response.status}; tenant ID could not be read.`,
       ],
     };
   }
@@ -176,7 +176,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
       title: 'Entra tenant (OIDC Check)',
       status: 'missing',
       summary: 'Not JSON',
-      lines: ['Response was not JSON — cannot parse issuer or endpoints.'],
+      lines: ['Response was not JSON; cannot parse issuer or endpoints.'],
     };
   }
 
@@ -225,7 +225,7 @@ async function checkM365TenantInternal(domain: string): Promise<M365TenantMailIn
   };
 }
 
-/** Query Entra OIDC discovery for organizational domain — returns tenant directory UUID when issuer/endpoints expose it. */
+/** Query Entra OIDC discovery for organisational domain; returns tenant directory UUID when issuer/endpoints expose it. */
 export async function checkM365Tenant(mailDomain: string): Promise<M365TenantMailInfraCheck> {
   return checkM365TenantInternal(mailDomain);
 }

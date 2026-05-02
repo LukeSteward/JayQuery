@@ -1,6 +1,6 @@
 import type { HealthStatus } from '@/lib/score/common';
 
-/** Shown when no STS TXT — also filtered from bullets when Detailed breakdown is off. */
+/** Shown when no STS TXT; also filtered from bullets when Detailed breakdown is off. */
 export const MTA_STS_ABSENT_DETAIL_TEXT =
   'No MTA-STS TXT (v=STSv1) at _mta-sts.';
 
@@ -15,7 +15,7 @@ export type MtaStsTxtAnalysis = {
 };
 
 /**
- * MTA-STS DNS TXT at _mta-sts.domain — matches Read-MtaStsRecord.ps1 from DNSHealth.
+ * MTA-STS DNS TXT at _mta-sts.domain; matches Read-MtaStsRecord.ps1 from DNSHealth.
  */
 export function analyzeMtaStsTxt(txtRecords: string[]): MtaStsTxtAnalysis {
   const stsLike = txtRecords.filter((t) =>
@@ -44,7 +44,7 @@ export function analyzeMtaStsTxt(txtRecords: string[]): MtaStsTxtAnalysis {
   if (recordCount > 1) {
     lines.push({
       status: 'warn',
-      text: 'Multiple MTA-STS TXT records — may cause unexpected behavior.',
+      text: 'Multiple MTA-STS TXT records; may cause unexpected behaviour.',
     });
   }
 

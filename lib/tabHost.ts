@@ -72,7 +72,7 @@ export async function getActiveTabHostname(): Promise<TabHostResult> {
     if (IPV4.test(rawHost)) {
       return {
         ok: false,
-        reason: 'IP addresses are not supported — use a domain name.',
+        reason: 'IP addresses are not supported; use a domain name.',
       };
     }
     if (rawHost.includes(':')) {

@@ -1,6 +1,6 @@
 import type { HealthStatus } from '@/lib/score/common';
 
-/** Shown when no TLS-RPT TXT — also filtered from bullets when Detailed breakdown is off. */
+/** Shown when no TLS-RPT TXT; also filtered from bullets when Detailed breakdown is off. */
 export const TLS_RPT_ABSENT_DETAIL_TEXT =
   'No TLS-RPT TXT (v=TLSRPTv1) at _smtp._tls.';
 
@@ -18,7 +18,7 @@ const RUA_MAILTO = /^mailto:(.+)$/i as RegExp;
 const RUA_HTTPS = /^https:\/\/.+/i as RegExp;
 
 /**
- * TLS reporting (TLS-RPT) TXT at _smtp._tls.domain — similar to Read-TlsRptRecord.ps1 from DNSHealth.
+ * TLS reporting (TLS-RPT) TXT at _smtp._tls.domain; similar to Read-TlsRptRecord.ps1 from DNSHealth.
  */
 export function analyzeTlsRptTxt(txtRecords: string[]): TlsRptTxtAnalysis {
   const tlsrptLike = txtRecords.filter((t) =>
@@ -47,7 +47,7 @@ export function analyzeTlsRptTxt(txtRecords: string[]): TlsRptTxtAnalysis {
   if (recordCount > 1) {
     lines.push({
       status: 'fail',
-      text: 'Multiple TLS-RPT records — invalid.',
+      text: 'Multiple TLS-RPT records; invalid.',
     });
   }
 

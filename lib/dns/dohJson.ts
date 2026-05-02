@@ -137,7 +137,7 @@ async function resolveDnsOutcome(
 }
 
 /**
- * Query public DoH — primary resolver from settings preference, alternate on failure or empty NOERROR.
+ * Query public DoH: primary resolver from settings preference, alternate on failure or empty NOERROR.
  * Throws if both providers fail the HTTP request (legacy behaviour for MX/NS).
  */
 export async function resolveDns(

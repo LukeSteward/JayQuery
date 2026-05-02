@@ -5,7 +5,7 @@ function normalizeSpfHostname(s: string): string {
 }
 
 /**
- * Whether any `v=spf1` TXT uses `include:` for the given hostname (exact match after normalization).
+ * Whether any `v=spf1` TXT uses `include:` for the given hostname (exact match after normalisation).
  */
 export function spfTxtRecordsInclude(
   txtRecords: string[],

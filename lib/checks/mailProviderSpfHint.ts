@@ -2,7 +2,7 @@ import type { TxtRecordsDetailed } from '@/lib/dns/dohJson';
 import { analyzeSpf, spfTxtRecordsInclude } from '@/lib/parse/spf';
 import type { HealthStatus } from '@/lib/score/common';
 
-/** Supplementary SPF check vs inbound MX provider profile — does not affect scoring. */
+/** Supplementary SPF check vs inbound MX provider profile; does not affect scoring. */
 export type SpfMailProviderHint = {
   providerName: string;
   status: HealthStatus;
@@ -11,7 +11,7 @@ export type SpfMailProviderHint = {
 };
 
 /**
- * Compare SPF TXT at the mail (organizational) domain to the include suggested by
+ * Compare SPF TXT at the mail (organisational) domain to the include suggested by
  * the identified MX host provider profile.
  */
 export function buildMailProviderSpfHint(
@@ -54,7 +54,7 @@ export function buildMailProviderSpfHint(
 
   if (spfA.multipleRecords) {
     lines.push(
-      'Several v=spf1 TXT strings exist for this name — only one SPF record is valid per RFC.',
+      'Several v=spf1 TXT strings exist for this name; only one SPF record is valid per RFC.',
     );
   }
 

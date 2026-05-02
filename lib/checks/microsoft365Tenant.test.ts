@@ -14,7 +14,7 @@ describe('extractTenantDirectoryIdFromUrl', () => {
     ).toBe('deadbeef-dead-beef-abcd-ef0123456789');
   });
 
-  it('normalizes casing to lowercase', () => {
+  it('normalises casing to lowercase', () => {
     expect(
       extractTenantDirectoryIdFromUrl(
         'https://login.microsoftonline.com/DEADbeef-DEAD-BEEF-ABCD-EF0123456789/oauth2/v2.0/token',
