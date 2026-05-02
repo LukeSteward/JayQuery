@@ -27,6 +27,15 @@ describe('identifyMxProvider', () => {
     expect(r?.dkimSelectors).toEqual(['google']);
   });
 
+  it('matches googlemail.com MX hosts used alongside aspmx.l.google.com', () => {
+    const r = identifyMxProvider(
+      [{ priority: 50, exchange: 'aspmx2.googlemail.com' }],
+      'example.com',
+    );
+    expect(r?.name).toBe('Google');
+    expect(r?.matchedExchange).toBe('aspmx2.googlemail.com');
+  });
+
   it('uses Mimecast Prefix for SPF include template', () => {
     const r = identifyMxProvider(
       [{ priority: 10, exchange: 'us-smtp-inbound-1.mimecast.com' }],
@@ -99,6 +108,20 @@ describe('analyzeMxProviderGroup', () => {
       'example.com',
     );
     expect(g.allSameProvider).toBe(false);
+    expect(g.identified?.name).toBe('Google');
+  });
+
+  it('marks allSameProvider for typical Google Workspace MX (l.google.com + googlemail.com)', () => {
+    const g = analyzeMxProviderGroup(
+      [
+        { priority: 10, exchange: 'aspmx.l.google.com' },
+        { priority: 30, exchange: 'alt1.aspmx.l.google.com' },
+        { priority: 40, exchange: 'alt2.aspmx.l.google.com' },
+        { priority: 50, exchange: 'aspmx2.googlemail.com' },
+      ],
+      'example.com',
+    );
+    expect(g.allSameProvider).toBe(true);
     expect(g.identified?.name).toBe('Google');
   });
 });

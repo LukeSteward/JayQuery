@@ -29,7 +29,8 @@ export const MAIL_PROVIDER_DEFINITIONS: MailProviderDefinition[] = [
   },
   {
     Name: 'Google',
-    MxMatch: 'google.com',
+    // Workspace publishes both *.l.google.com and *.googlemail.com MX hosts.
+    MxMatch: 'google\\.com|googlemail\\.com',
     SpfInclude: '_spf.google.com',
     Selectors: ['google'],
     MinimumSelectorPass: 1,
