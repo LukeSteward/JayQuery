@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   analyzeDkimRecord,
   dkimDnsWildcardFqdn,
+  dkimSelectorsForDnsProbe,
   isNullDkimDeclaration,
 } from '@/lib/parse/dkim';
 
@@ -51,5 +52,32 @@ describe('isNullDkimDeclaration', () => {
 describe('dkimDnsWildcardFqdn', () => {
   it('builds the literal star selector name', () => {
     expect(dkimDnsWildcardFqdn('example.com')).toBe('*._domainkey.example.com');
+  });
+});
+
+describe('dkimSelectorsForDnsProbe', () => {
+  it('uses default selector list when MX profile has no selectors', () => {
+    const fallback = dkimSelectorsForDnsProbe(undefined);
+    expect(fallback.length).toBeGreaterThan(2);
+    expect(fallback).toContain('google');
+    expect(dkimSelectorsForDnsProbe([])).toEqual(fallback);
+  });
+
+  it('uses only MX profile selectors when provided', () => {
+    expect(dkimSelectorsForDnsProbe(['selector1', 'selector2'])).toEqual([
+      'selector1',
+      'selector2',
+    ]);
+  });
+
+  it('dedupes and trims profile selectors', () => {
+    expect(dkimSelectorsForDnsProbe(['selector1 ', ' Selector1', 'selector2'])).toEqual([
+      'selector1',
+      'selector2',
+    ]);
+  });
+
+  it('falls back to defaults when profile is only whitespace', () => {
+    expect(dkimSelectorsForDnsProbe(['', '   '])).toContain('google');
   });
 });

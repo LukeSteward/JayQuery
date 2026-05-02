@@ -12,7 +12,7 @@ import { analyzeDmarc } from '@/lib/parse/dmarc';
 import {
   analyzeDkimRecord,
   dkimDnsWildcardFqdn,
-  getDkimSelectors,
+  dkimSelectorsForDnsProbe,
   isNullDkimDeclaration,
   type DkimRecordAnalysis,
 } from '@/lib/parse/dkim';
@@ -81,13 +81,18 @@ const DNS_FAIL_DMARC = (org: string): GradeLine[] => [
   },
 ];
 
-const DNS_FAIL_DKIM: GradeLine[] = [
-  {
-    status: 'fail',
-    text:
-      'Could not resolve DKIM TXT at *._domainkey, _domainkey, or any probed selector (DNS error or non-definitive response).',
-  },
-];
+function dnsFailDkimLines(mxProfileSelectors?: readonly string[]): GradeLine[] {
+  const probeHint =
+    mxProfileSelectors && mxProfileSelectors.length > 0
+      ? `configured selectors (${mxProfileSelectors.join(', ')})`
+      : 'any probed selector';
+  return [
+    {
+      status: 'fail',
+      text: `Could not resolve DKIM TXT at *._domainkey, _domainkey, or ${probeHint} (DNS error or non-definitive response).`,
+    },
+  ];
+}
 
 /** SPF/DKIM query target + DMARC organisational domain (from tab host). */
 export function resolveCheckTargets(
@@ -154,6 +159,9 @@ export async function runDnsCheck(
   const spfA = analyzeSpf(spfTxts);
   const dmarcA = analyzeDmarc(dmarcTxts);
 
+  const mxDkimSelectorsFromProfile = prof?.dkimSelectors;
+  const dkimProbeSelectors = dkimSelectorsForDnsProbe(mxDkimSelectorsFromProfile);
+
   let dkimBest: (DkimRecordAnalysis & { selector: string }) | null = null;
   let hadDefinitiveDkimLookup = false;
 
@@ -195,7 +203,7 @@ export async function runDnsCheck(
     } else if (apexDkimRec.valid) {
       dkimBest = { ...apexDkimRec, selector: '_domainkey' };
     } else {
-      for (const sel of getDkimSelectors()) {
+      for (const sel of dkimProbeSelectors) {
         const name = `${sel}._domainkey.${queryHost}`;
         const det = await resolveTxtDetailed(name, dnsTxt);
         if (det.dnsState === 'ok' || det.dnsState === 'nxdomain') {
@@ -238,7 +246,7 @@ export async function runDnsCheck(
 
   let spfBreakdown = buildSpfBreakdown(spfA);
   let dmarcBreakdown = buildDmarcBreakdown(dmarcA, orgDomain);
-  let dkimBreakdown = buildDkimBreakdown(dkimBest, queryHost);
+  let dkimBreakdown = buildDkimBreakdown(dkimBest, queryHost, dkimProbeSelectors);
 
   if (spfDnsErr) {
     spfScore = scoreDnsResolutionFailure(
@@ -255,11 +263,9 @@ export async function runDnsCheck(
     dmarcBreakdown = DNS_FAIL_DMARC(orgDomain);
   }
   if (dkimDnsErr) {
-    dkimScore = scoreDnsResolutionFailure(
-      'dkim',
-      'Could not resolve DKIM TXT at *._domainkey, _domainkey, or any probed selector (DNS error or non-definitive response).',
-    );
-    dkimBreakdown = DNS_FAIL_DKIM;
+    const dkimDnsFailLines = dnsFailDkimLines(mxDkimSelectorsFromProfile);
+    dkimScore = scoreDnsResolutionFailure('dkim', dkimDnsFailLines[0].text);
+    dkimBreakdown = dkimDnsFailLines;
   }
 
   return {

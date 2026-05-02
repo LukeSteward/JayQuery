@@ -202,9 +202,10 @@ export function buildDmarcBreakdown(
 export function buildDkimBreakdown(
   d: DkimRecordAnalysis & { selector: string },
   queryHost?: string,
+  probedSelectors?: readonly string[],
 ): GradeLine[] {
   const lines: GradeLine[] = [];
-  const selectors = getDkimSelectors().join(', ');
+  const selectors = (probedSelectors ?? getDkimSelectors()).join(', ');
   lines.push({
     status: 'info',
     text: queryHost

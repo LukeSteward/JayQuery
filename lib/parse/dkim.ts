@@ -23,6 +23,30 @@ export function getDkimSelectors(): readonly string[] {
 }
 
 /**
+ * DKIM TXT names to probe under `{selector}._domainkey.<domain>` after wildcard / apex checks.
+ * When MX identifies a provider with configured selectors, only those are queried (e.g. M365 → selector1, selector2).
+ * Otherwise {@link getDkimSelectors} order is used as a best-efforts sweep.
+ */
+export function dkimSelectorsForDnsProbe(
+  mxProfileSelectors?: readonly string[] | undefined,
+): readonly string[] {
+  if (!mxProfileSelectors?.length) {
+    return DKIM_SELECTORS;
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of mxProfileSelectors) {
+    const s = raw.trim();
+    if (!s) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out.length > 0 ? out : DKIM_SELECTORS;
+}
+
+/**
  * FQDN for the literal DKIM selector `*` (same as `nslookup -type=txt *._domainkey.example.com`).
  */
 export function dkimDnsWildcardFqdn(queryHost: string): string {

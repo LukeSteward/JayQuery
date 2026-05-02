@@ -39,6 +39,8 @@ export type MailInfraCheck = {
   providerProfile?: {
     name: string;
     expectedSpfInclude?: string;
+    /** MX provider profile selectors; DKIM DNS probes use these exclusively when present. */
+    dkimSelectors?: string[];
   };
 };
 
@@ -130,6 +132,9 @@ function checkMxFromRecords(mx: MxRecord[], domain: string): MailInfraCheck {
         name: identified.name,
         ...(identified.expectedSpfInclude?.trim()
           ? { expectedSpfInclude: identified.expectedSpfInclude.trim() }
+          : {}),
+        ...(identified.dkimSelectors?.length
+          ? { dkimSelectors: [...identified.dkimSelectors] }
           : {}),
       }
     : undefined;
