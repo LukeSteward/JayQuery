@@ -6,7 +6,7 @@ export default defineConfig({
     name: 'JayQuery',
     description:
       'SPF, DMARC, DKIM score plus MX, NS, MTA-STS, TLS-RPT, DNSSEC via DoH, and Entra OIDC tenant probe.',
-    permissions: ['activeTab', 'storage', 'tabs'],
+    permissions: ['storage', 'tabs'],
     host_permissions: [
       'http://*/*',
       'https://*/*',
