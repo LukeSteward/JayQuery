@@ -112,4 +112,30 @@ describe('resolveTxtRecordsDetailed', () => {
     await resolveTxtRecordsDetailed('spf.x.test');
     expect(String(fetchFn.mock.calls[0][0])).toContain('dns.google');
   });
+
+  it('concatenates multi-chunk TXT in one answer (Cloudflare-style)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          Status: RCODE.NOERROR,
+          Answer: [
+            {
+              name: '_example.test',
+              type: 16,
+              data:
+                '"v=DMARC1;" "p=quarantine;" "rua=mailto:a@x.test;"',
+            },
+          ],
+        }),
+      ),
+    );
+    const r = await resolveTxtRecordsDetailed('_dmarc.example.test', {
+      dnsProvider: 'cloudflare',
+    });
+    expect(r.dnsState).toBe('ok');
+    expect(r.strings).toEqual([
+      'v=DMARC1;p=quarantine;rua=mailto:a@x.test;',
+    ]);
+  });
 });
