@@ -1,0 +1,39 @@
+# Builds a distributable Chrome MV3 zip (WXT) and uploads it as a workflow artifact.
+# Download: repo → Actions → latest run → Artifacts. Unzip, then chrome://extensions → Load unpacked → select the extracted folder.
+
+name: Extension zip
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-zip-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Produce extension zip (Chrome MV3)
+        run: npm run zip
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: jayquery-chrome-mv3
+          path: .output/*.zip
+          if-no-files-found: error
