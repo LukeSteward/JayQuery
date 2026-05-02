@@ -1,4 +1,4 @@
-# DNS Health Check
+# JayQuery
 
 Browser extension (**Chrome / Edge**, Manifest V3) that inspects the **active tab’s hostname**, resolves **TXT** records over **DNS-over-HTTPS** (Cloudflare primary, Google fallback), evaluates **SPF**, **DMARC**, and **DKIM** (common selectors), and shows a **score out of 10** with a per-protocol breakdown.
 
@@ -18,7 +18,7 @@ Conceptually aligned with [JohnDuprey/DNSHealth](https://github.com/johnduprey/D
 
 ## Prerequisites
 
-- Node.js **18+** and npm
+- Node.js **24+** and npm
 
 ## Development
 
@@ -43,7 +43,7 @@ Output: **`.output/chrome-mv3/`** (unpackaged extension).
 2. Enable **Developer mode**
 3. **Load unpacked** → select your clone’s `.output/chrome-mv3` folder
 
-Pin the **DNS Health** action, visit a site served over **HTTPS**, then click the icon to open the popup.
+Pin the **JayQuery** action, visit a site served over **HTTPS**, then click the icon to open the popup.
 
 ### Load in Microsoft Edge
 
@@ -68,5 +68,3 @@ npm test
 This project is licensed under the [**PolyForm Noncommercial License 1.0.0**](https://polyformproject.org/licenses/noncommercial/1.0.0/) — see [`LICENSE`](LICENSE).
 
 In short: you may **use, study, modify, and share** the project for **noncommercial** purposes (including personal use and many nonprofit / educational uses). **Commercial use** — including **selling** the software, offering it for a fee, or building **paid products or services** on top of it — **is not allowed** under this license without separate permission from the copyright holder.
-
-Replace **JayQuery contributors** in `LICENSE` with your **name or legal entity** before publishing if you want that line to reflect real ownership.

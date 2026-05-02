@@ -29,7 +29,9 @@ export type ExtensionSettings = {
   detailedBreakdown: boolean;
 };
 
-const STORAGE_KEY = 'dnsHealthSettings';
+const STORAGE_KEY = 'jayquerySettings';
+/** Previous key; migrated on load so upgrades keep preferences. */
+const LEGACY_STORAGE_KEY = 'dnsHealthSettings';
 
 const VALID_DRIVERS: ToolbarIconDriver[] = [
   'combined',
@@ -62,9 +64,11 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
 };
 
 export async function loadSettings(): Promise<ExtensionSettings> {
-  const raw = await browser.storage.local.get(STORAGE_KEY);
-  const v = raw[STORAGE_KEY] as Partial<ExtensionSettings> | undefined;
-  return {
+  const raw = await browser.storage.local.get([STORAGE_KEY, LEGACY_STORAGE_KEY]);
+  const v = (raw[STORAGE_KEY] ?? raw[LEGACY_STORAGE_KEY]) as
+    | Partial<ExtensionSettings>
+    | undefined;
+  const next: ExtensionSettings = {
     coloredToolbarIcon:
       typeof v?.coloredToolbarIcon === 'boolean'
         ? v.coloredToolbarIcon
@@ -80,6 +84,11 @@ export async function loadSettings(): Promise<ExtensionSettings> {
         ? v.detailedBreakdown
         : DEFAULT_SETTINGS.detailedBreakdown,
   };
+  if (raw[STORAGE_KEY] === undefined && raw[LEGACY_STORAGE_KEY] !== undefined) {
+    await browser.storage.local.set({ [STORAGE_KEY]: next });
+    await browser.storage.local.remove(LEGACY_STORAGE_KEY);
+  }
+  return next;
 }
 
 export async function saveSettings(s: ExtensionSettings): Promise<void> {

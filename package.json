@@ -1,5 +1,5 @@
 {
-  "name": "dns-health-extension",
+  "name": "jayquery",
   "description": "SPF, DMARC, and DKIM checks for the active tab hostname (Chrome & Edge).",
   "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
