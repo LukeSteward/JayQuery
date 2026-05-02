@@ -56,6 +56,19 @@ describe('scoring', () => {
     expect(dmarc.detail).toMatch(/Multiple DMARC/i);
   });
 
+  it('valid DKIM with RSA reaches full DKIM points', () => {
+    const dkim = scoreDkim({
+      valid: true,
+      selector: 'selector1',
+      hasVersion: true,
+      keyType: 'rsa',
+      publicKeyEmpty: false,
+      raw: 'v=DKIM1; k=rsa; p=MIIB',
+    });
+    expect(dkim.status).toBe('pass');
+    expect(dkim.points).toBe(3);
+  });
+
   it('null DKIM declaration at * or _domainkey selector scores pass', () => {
     for (const selector of ['*', '_domainkey'] as const) {
       const dkim = scoreDkim({

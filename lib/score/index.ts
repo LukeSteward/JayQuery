@@ -201,7 +201,7 @@ export function scoreDkim(
     };
   }
 
-  let p = 2.55;
+  let p = 2.65;
   const k = (best.keyType ?? 'rsa').toLowerCase();
   if (k.includes('ed25519')) p += 0.35;
   else if (k.includes('rsa')) p += 0.35;
