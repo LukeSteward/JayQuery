@@ -107,6 +107,140 @@ function mxtoolboxEmailHealthUrl(domain: string): string {
   return `https://mxtoolbox.com/emailhealth/${encodeURIComponent(domain)}`;
 }
 
+const WALL_OF_SHAME_REPO = 'jkerai1/DMARC-WallOfShame';
+
+function wallOfShameNewIssueUrl(company: string, result: CheckResult): string {
+  const domain = result.dmarcLookupHost;
+  const title = `${company} — ${domain}`;
+  const bodyParts = [
+    `**Company:** ${company}`,
+    `**Domain:** ${domain}`,
+  ];
+  if (result.queryHostname !== result.dmarcLookupHost) {
+    bodyParts.push(`**Checked hostname:** ${result.queryHostname}`);
+  }
+  bodyParts.push('', '_Submitted via JayQuery browser extension._');
+  const body = bodyParts.join('\n');
+  const params = new URLSearchParams({ title, body });
+  return `https://github.com/${WALL_OF_SHAME_REPO}/issues/new?${params}`;
+}
+
+/** Opens a URL from a user gesture (e.g. modal submit) without extra extension permissions. */
+function openUrlInNewTab(url: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noreferrer noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function renderResultFooterActions(result: CheckResult): string {
+  const showCastShame = result.full.dmarc.status === 'fail';
+  const castShameBtn = showCastShame
+    ? `<button type="button" class="footer-action-btn footer-action-btn--shame" id="btn-cast-shame">Cast shame</button>`
+    : '';
+  return `
+    <div class="fab-row fab-row--footer fab-row--split">
+      <div class="footer-actions">
+        <a class="footer-action-btn footer-action-btn--link" href="${mxtoolboxEmailHealthUrl(result.dmarcLookupHost)}" target="_blank" rel="noreferrer noopener">Crosscheck on MXToolbox</a>
+        ${castShameBtn}
+      </div>
+      ${fabSettingsButton()}
+    </div>
+  `;
+}
+
+function renderCastShameModal(result: CheckResult): string {
+  return `
+    <div class="cast-shame-modal" id="cast-shame-modal" hidden aria-hidden="true">
+      <div class="cast-shame-modal__backdrop" id="cast-shame-backdrop" aria-hidden="true"></div>
+      <div class="cast-shame-modal__panel" role="dialog" aria-modal="true" aria-labelledby="cast-shame-heading">
+        <h2 class="cast-shame-modal__title" id="cast-shame-heading">Submit to DMARC wall of Shame</h2>
+        <p class="cast-shame-modal__lede">Please submit the company name for the DMARC issue.</p>
+        <label class="cast-shame-modal__label" for="cast-shame-company">Company name</label>
+        <input type="text" class="cast-shame-modal__input" id="cast-shame-company" autocomplete="organization" maxlength="160" placeholder="e.g. Acme Corp" />
+        <p class="cast-shame-modal__error" id="cast-shame-error" hidden role="alert">Enter a company name.</p>
+        <div class="cast-shame-modal__actions">
+          <button type="button" class="cast-shame-modal__btn cast-shame-modal__btn--ghost" id="cast-shame-cancel">Cancel</button>
+          <button type="button" class="cast-shame-modal__btn cast-shame-modal__btn--primary" id="cast-shame-submit">Continue to GitHub</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function bindCastShameModal(result: CheckResult): void {
+  const openBtn = document.getElementById('btn-cast-shame');
+  const modal = document.getElementById('cast-shame-modal');
+  const backdrop = document.getElementById('cast-shame-backdrop');
+  const cancel = document.getElementById('cast-shame-cancel');
+  const submit = document.getElementById('cast-shame-submit');
+  const inputEl = document.getElementById('cast-shame-company');
+  const errEl = document.getElementById('cast-shame-error');
+  if (
+    !openBtn ||
+    !modal ||
+    !backdrop ||
+    !cancel ||
+    !submit ||
+    !(inputEl instanceof HTMLInputElement) ||
+    !errEl
+  ) {
+    return;
+  }
+
+  const modalRoot = modal;
+  const openerBtn = openBtn;
+  const shameInput = inputEl;
+  const shameErr = errEl;
+
+  function closeModal(): void {
+    modalRoot.hidden = true;
+    modalRoot.setAttribute('aria-hidden', 'true');
+    shameInput.value = '';
+    shameErr.hidden = true;
+    openerBtn.focus();
+  }
+
+  function openModal(): void {
+    shameErr.hidden = true;
+    modalRoot.hidden = false;
+    modalRoot.setAttribute('aria-hidden', 'false');
+    shameInput.focus();
+  }
+
+  openerBtn.addEventListener('click', openModal);
+  backdrop.addEventListener('click', closeModal);
+  cancel.addEventListener('click', closeModal);
+
+  submit.addEventListener('click', () => {
+    const trimmed = shameInput.value.trim();
+    if (!trimmed) {
+      shameErr.hidden = false;
+      shameInput.focus();
+      return;
+    }
+    openUrlInNewTab(wallOfShameNewIssueUrl(trimmed, result));
+    closeModal();
+  });
+
+  modalRoot.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    }
+  });
+
+  shameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit.click();
+    }
+  });
+}
+
 function renderScoreRing(overall: number): string {
   const pct = Math.min(100, Math.max(0, (overall / 10) * 100));
   const deg = (pct / 100) * 360;
@@ -292,6 +426,8 @@ function renderResult(result: CheckResult): void {
   const { full } = result;
   const dkimRaw = result.dkim.raw;
   const tabDiffers = result.tabHostname !== result.queryHostname;
+  const castShameModal =
+    full.dmarc.status === 'fail' ? renderCastShameModal(result) : '';
 
   root.innerHTML = `
     <div class="shell shell--with-fab">
@@ -348,20 +484,15 @@ function renderResult(result: CheckResult): void {
       </div>
 
       <footer class="footer">
-        <p>
-          Cross-check on
-          <a href="${mxtoolboxEmailHealthUrl(result.dmarcLookupHost)}" target="_blank" rel="noreferrer noopener">MXToolbox Email Health</a>
-          for <span class="mono">${escapeHtml(result.dmarcLookupHost)}</span>.
-        </p>
         <p>DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only — no MTA-STS policy files or cert inspection. DKIM uses common selectors only.</p>
-        <div class="fab-row fab-row--footer">
-          ${fabSettingsButton()}
-        </div>
+        ${renderResultFooterActions(result)}
       </footer>
+      ${castShameModal}
     </div>
   `;
   bindModeButtons(result.mode, false);
   bindSettingsFab();
+  bindCastShameModal(result);
   bindMailInfraCopyButtons();
 }
 
