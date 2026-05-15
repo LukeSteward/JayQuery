@@ -29,9 +29,19 @@ export function getDkimSelectors(): readonly string[] {
  */
 export function dkimSelectorsForDnsProbe(
   mxProfileSelectors?: readonly string[] | undefined,
+  customSelectors?: readonly string[] | undefined,
 ): readonly string[] {
   const seen = new Set<string>();
   const out: string[] = [];
+
+  for (const raw of customSelectors ?? []) {
+    const s = raw.trim();
+    if (!s) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
 
   for (const raw of mxProfileSelectors ?? []) {
     const s = raw.trim();

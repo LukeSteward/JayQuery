@@ -36,6 +36,8 @@ export type DnsCheckOptions = {
   treatDnsResolutionErrorsAsFailure?: boolean;
   /** Which public DoH endpoint is queried first. Default `google`. */
   dnsProvider?: DnsProvider;
+  /** User-supplied DKIM selectors to try before provider and fallback selectors. */
+  customDkimSelectors?: readonly string[];
 };
 
 export type CheckResult = {
@@ -160,7 +162,10 @@ export async function runDnsCheck(
   const dmarcA = analyzeDmarc(dmarcTxts);
 
   const mxDkimSelectorsFromProfile = prof?.dkimSelectors;
-  const dkimProbeSelectors = dkimSelectorsForDnsProbe(mxDkimSelectorsFromProfile);
+  const dkimProbeSelectors = dkimSelectorsForDnsProbe(
+    mxDkimSelectorsFromProfile,
+    options?.customDkimSelectors,
+  );
 
   let dkimBest: (DkimRecordAnalysis & { selector: string }) | null = null;
   let hadDefinitiveDkimLookup = false;

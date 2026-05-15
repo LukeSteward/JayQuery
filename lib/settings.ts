@@ -30,6 +30,8 @@ export type ExtensionSettings = {
    * When false, only actionable lines (warn, fail, missing) are listed for compact results.
    */
   detailedBreakdown: boolean;
+  /** Extra DKIM selectors to probe before provider and fallback selectors. */
+  customDkimSelectors: string[];
   /** Whether the root-vs-tab-host welcome screen has been dismissed. */
   firstRunWelcomeSeen: boolean;
 };
@@ -76,11 +78,28 @@ function normalizeDnsProvider(v: unknown): DnsProvider {
     : DEFAULT_SETTINGS.dnsProvider;
 }
 
+function normalizeCustomDkimSelectors(v: unknown): string[] {
+  if (!Array.isArray(v)) return DEFAULT_SETTINGS.customDkimSelectors;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of v) {
+    if (typeof raw !== 'string') continue;
+    const selector = raw.trim();
+    if (!selector || selector.includes('.') || selector.includes(' ')) continue;
+    const key = selector.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(selector);
+  }
+  return out.slice(0, 20);
+}
+
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   treatDnsResolutionErrorsAsFailure: true,
   toolbarIconDriver: 'combined',
   dnsProvider: 'google',
   detailedBreakdown: false,
+  customDkimSelectors: [],
   firstRunWelcomeSeen: false,
 };
 
@@ -100,6 +119,7 @@ export async function loadSettings(): Promise<ExtensionSettings> {
       typeof v?.detailedBreakdown === 'boolean'
         ? v.detailedBreakdown
         : DEFAULT_SETTINGS.detailedBreakdown,
+    customDkimSelectors: normalizeCustomDkimSelectors(v?.customDkimSelectors),
     firstRunWelcomeSeen:
       typeof v?.firstRunWelcomeSeen === 'boolean'
         ? v.firstRunWelcomeSeen

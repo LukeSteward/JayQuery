@@ -5,6 +5,7 @@ import type { HealthStatus } from '@/lib/score/common';
 /** Supplementary SPF check vs inbound MX provider profile; does not affect scoring. */
 export type SpfMailProviderHint = {
   providerName: string;
+  expectedInclude: string;
   status: HealthStatus;
   summary: string;
   lines: string[];
@@ -26,6 +27,7 @@ export function buildMailProviderSpfHint(
   if (orgSpfTxt.dnsState === 'error') {
     return {
       providerName,
+      expectedInclude: expected,
       status: 'fail',
       summary: 'SPF lookup failed',
       lines: [
@@ -40,6 +42,7 @@ export function buildMailProviderSpfHint(
   if (!spfA.present) {
     return {
       providerName,
+      expectedInclude: expected,
       status: 'missing',
       summary: 'No SPF on mail domain',
       lines: [
@@ -62,6 +65,7 @@ export function buildMailProviderSpfHint(
     // Summary already states the include; avoid repeating the same line below.
     return {
       providerName,
+      expectedInclude: expected,
       status: spfA.multipleRecords ? 'warn' : 'pass',
       summary: `Includes ${expected}`,
       lines,
@@ -76,6 +80,7 @@ export function buildMailProviderSpfHint(
   );
   return {
     providerName,
+    expectedInclude: expected,
     status: 'warn',
     summary: `Missing include:${expected}`,
     lines,

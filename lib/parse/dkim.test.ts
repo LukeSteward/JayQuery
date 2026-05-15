@@ -76,6 +76,20 @@ describe('dkimSelectorsForDnsProbe', () => {
     ]);
   });
 
+  it('uses custom selectors before provider and fallback selectors', () => {
+    expect(dkimSelectorsForDnsProbe(['selector1'], ['custom', 'selector1'])).toEqual([
+      'custom',
+      'selector1',
+      'google',
+      'default',
+      'selector2',
+      'k1',
+      's1',
+      'dkim',
+      'mail',
+    ]);
+  });
+
   it('dedupes and trims profile selectors', () => {
     expect(dkimSelectorsForDnsProbe(['selector1 ', ' Selector1', 'selector2'])).toEqual([
       'selector1',

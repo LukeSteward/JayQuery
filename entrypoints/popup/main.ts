@@ -38,6 +38,9 @@ let settings: ExtensionSettings = { ...DEFAULT_SETTINGS };
 let currentView: 'welcome' | 'main' | 'settings' = 'main';
 let lastMode: CheckMode = 'apex';
 let lastResult: CheckResult | null = null;
+let compareResult: CheckResult | null = null;
+let lastResultUpdatesToolbar = true;
+let compareRequestId = 0;
 
 const COG_SVG = `<svg class="fab__icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.48.5.87.97 1.05V10a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
 
@@ -100,6 +103,11 @@ function statusLabel(status: HealthStatus): string {
   }
 }
 
+function gradeStatusLabel(status: GradeLine['status']): string {
+  if (status === 'info') return 'Info';
+  return statusLabel(status);
+}
+
 function truncate(s: string, max: number): string {
   const t = s.trim();
   if (t.length <= max) return t;
@@ -117,7 +125,7 @@ function mxtoolboxEmailHealthUrl(domain: string): string {
 }
 
 const DNS_TECHNIQUE_DISCLOSURE =
-  'DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only; no MTA-STS policy files or cert inspection. DKIM probes _domainkey for null DKIM, then provider/common selectors, then *._domainkey.';
+  'DNS queries use DNS-over-HTTPS (Cloudflare / Google). Entra probe uses HTTPS only; no MTA-STS policy files or cert inspection. DKIM probes _domainkey for null DKIM, then configured/provider/common selectors, then *._domainkey.';
 
 /** Opens a URL from a user gesture (e.g. modal submit) without extra extension permissions. */
 function openUrlInNewTab(url: string): void {
@@ -135,6 +143,11 @@ function hasReportableDmarcIssue(result: CheckResult): boolean {
 }
 
 function renderResultFooterActions(result: CheckResult): string {
+  const rootTargets = resolveCheckTargets(result.tabHostname, 'apex');
+  const showCompare = rootTargets.queryHost !== rootTargets.tab;
+  const compareBtn = showCompare
+    ? `<button type="button" class="footer-action-btn" id="btn-compare-scope">Compare root/tab</button>`
+    : '';
   const showCastShame = hasReportableDmarcIssue(result);
   const castShameBtn = showCastShame
     ? `<button type="button" class="footer-action-btn footer-action-btn--shame" id="btn-cast-shame">Report DMARC issue</button>`
@@ -142,6 +155,8 @@ function renderResultFooterActions(result: CheckResult): string {
   return `
     <div class="fab-row fab-row--footer fab-row--split">
       <div class="footer-actions">
+        <button type="button" class="footer-action-btn" id="btn-copy-report">Copy report</button>
+        ${compareBtn}
         <a class="footer-action-btn footer-action-btn--link" href="${mxtoolboxEmailHealthUrl(result.dmarcLookupHost)}" target="_blank" rel="noreferrer noopener">Crosscheck on MXToolbox</a>
         ${castShameBtn}
       </div>
@@ -258,6 +273,108 @@ function renderScoreRing(overall: number): string {
   `;
 }
 
+function renderScoreExplanation(full: FullScore): string {
+  return `
+    <details class="score-explain">
+      <summary>Why this score?</summary>
+      <div class="score-explain__body">
+        <p>The overall score is the sum of the three email-authentication pillars: SPF up to 3 points, DMARC up to 4, and DKIM up to 3.</p>
+        <div class="score-explain__rows">
+          <div><span>SPF</span><strong>${formatScoreTenth(full.spf.points)} / ${full.spf.max}</strong><em>${escapeHtml(full.spf.detail)}</em></div>
+          <div><span>DMARC</span><strong>${formatScoreTenth(full.dmarc.points)} / ${full.dmarc.max}</strong><em>${escapeHtml(full.dmarc.detail)}</em></div>
+          <div><span>DKIM</span><strong>${formatScoreTenth(full.dkim.points)} / ${full.dkim.max}</strong><em>${escapeHtml(full.dkim.detail)}</em></div>
+        </div>
+      </div>
+    </details>
+  `;
+}
+
+function statusSummary(label: string, score: FullScore['spf']): string {
+  return `${label}: ${statusLabel(score.status)} (${formatScoreTenth(score.points)}/${score.max}) - ${score.detail}`;
+}
+
+function reportLines(result: CheckResult): string[] {
+  const lines = [
+    `JayQuery report for ${result.queryHostname}`,
+    `Checked hostname: ${result.tabHostname}`,
+    `DMARC lookup: _dmarc.${result.dmarcLookupHost}`,
+    `Mode: ${result.mode === 'apex' ? 'Root domain' : 'Tab hostname'}`,
+    `Overall score: ${formatScoreTenth(result.full.overall)}/10`,
+    '',
+    statusSummary('SPF', result.full.spf),
+    statusSummary('DMARC', result.full.dmarc),
+    statusSummary('DKIM', result.full.dkim),
+  ];
+
+  if (result.dkim.selector) {
+    lines.push(`DKIM selector: ${result.dkim.selector}`);
+  }
+
+  lines.push('', 'Mail infrastructure:');
+  for (const check of result.mailInfra) {
+    lines.push(`- ${check.title}: ${statusLabel(check.status)} - ${check.summary}`);
+  }
+
+  const findings = [
+    ...filterBreakdownForCompactMode(result.spfBreakdown),
+    ...filterBreakdownForCompactMode(result.dmarcBreakdown),
+    ...filterBreakdownForCompactMode(result.dkimBreakdown),
+  ];
+  if (findings.length) {
+    lines.push('', 'Findings:');
+    for (const finding of findings) {
+      lines.push(`- ${gradeStatusLabel(finding.status)}: ${finding.text}`);
+    }
+  }
+
+  return lines;
+}
+
+async function copyReport(result: CheckResult, btn: HTMLButtonElement): Promise<void> {
+  const originalText = btn.textContent ?? 'Copy report';
+  try {
+    await navigator.clipboard.writeText(reportLines(result).join('\n'));
+    btn.textContent = 'Copied';
+  } catch (err) {
+    console.error('clipboard: failed to copy report', err);
+    btn.textContent = 'Copy failed';
+  } finally {
+    window.setTimeout(() => {
+      btn.textContent = originalText;
+    }, 1400);
+  }
+}
+
+async function loadScopeComparison(
+  result: CheckResult,
+  btn: HTMLButtonElement,
+): Promise<void> {
+  const otherMode: CheckMode = result.mode === 'apex' ? 'exact' : 'apex';
+  const requestId = ++compareRequestId;
+  const originalText = btn.textContent ?? 'Compare root/tab';
+  btn.disabled = true;
+  btn.textContent = 'Comparing';
+  try {
+    const nextCompareResult = await runDnsCheck(result.tabHostname, otherMode, {
+      treatDnsResolutionErrorsAsFailure:
+        settings.treatDnsResolutionErrorsAsFailure,
+      dnsProvider: settings.dnsProvider,
+      customDkimSelectors: settings.customDkimSelectors,
+    });
+    if (requestId !== compareRequestId) return;
+    compareResult = nextCompareResult;
+    renderResult(result);
+  } catch (err) {
+    if (requestId !== compareRequestId) return;
+    console.error('compare: failed to compare root and tab hostname', err);
+    btn.textContent = 'Compare failed';
+    btn.disabled = false;
+    window.setTimeout(() => {
+      btn.textContent = originalText;
+    }, 1400);
+  }
+}
+
 function renderGradeBreakdown(lines: GradeLine[]): string {
   if (!lines.length) return '';
   return `<ul class="breakdown" aria-label="Grading details">${lines
@@ -284,6 +401,38 @@ function renderSpfMailProviderHint(h: SpfMailProviderHint): string {
       <p class="spf-provider-hint__summary">${escapeHtml(h.summary)}</p>
       ${lineBlock}
     </div>`;
+}
+
+function renderFixGuidance(title: 'SPF' | 'DMARC' | 'DKIM', result: CheckResult): string {
+  const score = title === 'SPF'
+    ? result.full.spf
+    : title === 'DMARC'
+      ? result.full.dmarc
+      : result.full.dkim;
+  if (score.status === 'pass') return '';
+
+  const host = title === 'DMARC'
+    ? `_dmarc.${result.dmarcLookupHost}`
+    : result.queryHostname;
+  let guidance = '';
+  if (title === 'SPF') {
+    const providerInclude = result.spfMailProviderHint?.expectedInclude;
+    const example = providerInclude
+      ? `v=spf1 include:${providerInclude} -all`
+      : 'v=spf1 -all';
+    guidance = `Publish one TXT record at ${host}. Example for a domain that sends no mail, or after adding approved senders: ${example}`;
+  } else if (title === 'DMARC') {
+    guidance = `Publish one TXT record at ${host}. Start with reporting, then move toward enforcement: v=DMARC1; p=none; rua=mailto:dmarc@example.com`;
+  } else {
+    guidance = 'Confirm the selector your mail platform signs with, then publish that selector under selector._domainkey. Custom selectors can be added in settings.';
+  }
+
+  return `
+    <details class="fix-guidance">
+      <summary>Fix guidance</summary>
+      <p>${escapeHtml(guidance)}</p>
+    </details>
+  `;
 }
 
 function renderProtocolCard(
@@ -375,6 +524,18 @@ function renderHeaderBrand(hostname: string): string {
   `;
 }
 
+function renderManualLookupForm(hostname: string): string {
+  return `
+    <form class="manual-lookup" id="manual-lookup-form">
+      <label class="manual-lookup__label" for="manual-lookup-domain">Check domain</label>
+      <div class="manual-lookup__row">
+        <input class="manual-lookup__input" id="manual-lookup-domain" value="${escapeHtml(hostname)}" autocomplete="off" spellcheck="false" />
+        <button type="submit" class="manual-lookup__btn">Check</button>
+      </div>
+    </form>
+  `;
+}
+
 function renderWelcome(): void {
   const targets = resolveCheckTargets(tabHostname, 'apex');
   const rootHost = targets.queryHost;
@@ -389,6 +550,7 @@ function renderWelcome(): void {
   root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
         ${renderHeaderBrand(rootHost)}
+        ${renderManualLookupForm(rootHost)}
       </header>
       <section class="welcome" aria-labelledby="welcome-title">
         <p class="welcome__kicker">First run</p>
@@ -403,26 +565,29 @@ function renderWelcome(): void {
       </section>
   `);
   bindWelcomeActions();
+  bindManualLookupForm();
   bindSettingsFab();
 }
 
-function renderLoading(mode: CheckMode): void {
-  const targets = tabHostname ? resolveCheckTargets(tabHostname, mode) : null;
-  const rootTargets = tabHostname ? resolveCheckTargets(tabHostname, 'apex') : null;
+function renderLoading(mode: CheckMode, hostname: string): void {
+  const targets = hostname ? resolveCheckTargets(hostname, mode) : null;
+  const rootTargets = hostname ? resolveCheckTargets(hostname, 'apex') : null;
   const headerHost = targets?.queryHost ?? '';
   const showExact = rootTargets ? rootTargets.queryHost !== rootTargets.tab : true;
   root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
         ${headerHost ? renderHeaderBrand(headerHost) : '<h1 class="header__title header__title--solo">JayQuery</h1>'}
+        ${renderManualLookupForm(headerHost || hostname)}
         ${modeChips(mode, showExact)}
-        <p class="header__hint">${escapeHtml(loadingLabel(mode, tabHostname))}</p>
+        <p class="header__hint">${escapeHtml(loadingLabel(mode, hostname))}</p>
       </header>
       <div class="loading">
         <div class="loading__pulse"></div>
         <p>Querying public DNS (DoH)…</p>
       </div>
   `);
-  bindModeButtons(mode, true);
+  bindModeButtons(mode, true, hostname);
+  bindManualLookupForm();
   bindSettingsFab();
 }
 
@@ -431,11 +596,13 @@ function renderError(message: string): void {
   root.innerHTML = shellWithFabFooterOnly(`
       <header class="header">
         ${tabHostname ? renderHeaderBrand(tabHostname) : '<h1 class="header__title header__title--solo">JayQuery</h1>'}
+        ${renderManualLookupForm(tabHostname)}
       </header>
       <div class="panel panel--warn">
         <p class="panel__text">${escapeHtml(message)}</p>
       </div>
   `);
+  bindManualLookupForm();
   bindSettingsFab();
 }
 
@@ -480,6 +647,39 @@ function renderMailInfraCard(
   `;
 }
 
+function renderComparisonValue(label: string, current: FullScore['spf'], other: FullScore['spf']): string {
+  const changed = current.status !== other.status || current.points !== other.points;
+  return `
+    <div class="scope-compare__row ${changed ? 'scope-compare__row--changed' : ''}">
+      <span>${label}</span>
+      <span>${statusLabel(current.status)} ${formatScoreTenth(current.points)}/${current.max}</span>
+      <span>${statusLabel(other.status)} ${formatScoreTenth(other.points)}/${other.max}</span>
+    </div>
+  `;
+}
+
+function renderScopeComparison(current: CheckResult, other: CheckResult | null): string {
+  if (!other) return '';
+  return `
+    <section class="scope-compare" aria-label="Root domain versus tab hostname comparison">
+      <div class="scope-compare__head">
+        <h2>Root vs tab hostname</h2>
+        <span>${current.mode === 'apex' ? 'Current: root' : 'Current: tab'}</span>
+      </div>
+      <div class="scope-compare__grid scope-compare__grid--head">
+        <span>Check</span>
+        <span>${escapeHtml(current.queryHostname)}</span>
+        <span>${escapeHtml(other.queryHostname)}</span>
+      </div>
+      <div class="scope-compare__grid">
+        ${renderComparisonValue('SPF', current.full.spf, other.full.spf)}
+        ${renderComparisonValue('DMARC', current.full.dmarc, other.full.dmarc)}
+        ${renderComparisonValue('DKIM', current.full.dkim, other.full.dkim)}
+      </div>
+    </section>
+  `;
+}
+
 function dmarcHint(result: CheckResult): string {
   return `DMARC is always read from _dmarc.${result.dmarcLookupHost} (organisational domain of the tab). SPF and DKIM use ${result.queryHostname}.`;
 }
@@ -498,11 +698,13 @@ function renderResult(result: CheckResult): void {
     (detailedBreakdown || result.spfMailProviderHint.status !== 'pass')
       ? renderSpfMailProviderHint(result.spfMailProviderHint)
       : '';
+  const spfFooter = `${spfSupplement}${renderFixGuidance('SPF', result)}`;
 
   root.innerHTML = `
     <div class="shell shell--with-fab">
       <header class="header">
         ${renderHeaderBrand(result.queryHostname)}
+        ${renderManualLookupForm(result.queryHostname)}
         ${modeChips(result.mode, showExact)}
       </header>
 
@@ -510,6 +712,10 @@ function renderResult(result: CheckResult): void {
         ${renderScoreRing(full.overall)}
         <p class="hero__label">SPF + DMARC + DKIM (max 10)</p>
       </section>
+
+      ${renderScoreExplanation(full)}
+
+      ${renderScopeComparison(result, compareResult)}
 
       <div class="cards">
         ${renderProtocolCard(
@@ -520,7 +726,7 @@ function renderResult(result: CheckResult): void {
           result.spfBreakdown,
           detailedBreakdown,
           undefined,
-          spfSupplement || undefined,
+          spfFooter || undefined,
         )}
         ${renderProtocolCard(
           'DMARC',
@@ -530,6 +736,7 @@ function renderResult(result: CheckResult): void {
           result.dmarcBreakdown,
           detailedBreakdown,
           dmarcHint(result),
+          renderFixGuidance('DMARC', result) || undefined,
         )}
         ${renderProtocolCard(
           'DKIM',
@@ -538,6 +745,8 @@ function renderResult(result: CheckResult): void {
           dkimRaw,
           result.dkimBreakdown,
           detailedBreakdown,
+          undefined,
+          renderFixGuidance('DKIM', result) || undefined,
         )}
         ${result.mailInfra
           .map((c) =>
@@ -560,10 +769,25 @@ function renderResult(result: CheckResult): void {
       ${castShameModal}
     </div>
   `;
-  bindModeButtons(result.mode, false);
+  bindModeButtons(result.mode, false, result.tabHostname, lastResultUpdatesToolbar);
+  bindManualLookupForm();
   bindSettingsFab();
   bindCastShameModal(result);
+  bindCopyReport(result);
+  bindScopeCompare(result);
   bindMailInfraCopyButtons();
+}
+
+function bindCopyReport(result: CheckResult): void {
+  const btn = document.getElementById('btn-copy-report');
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.addEventListener('click', () => void copyReport(result, btn));
+}
+
+function bindScopeCompare(result: CheckResult): void {
+  const btn = document.getElementById('btn-compare-scope');
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.addEventListener('click', () => void loadScopeComparison(result, btn));
 }
 
 function renderSettings(): void {
@@ -611,6 +835,13 @@ function renderSettings(): void {
         <details class="settings-advanced">
           <summary class="settings-advanced__summary">Advanced</summary>
           <div class="settings-advanced__inner">
+            <label class="settings-text-field">
+              <span class="settings-row__text">
+                <strong>Custom DKIM selectors</strong>
+                <span class="settings-row__hint">Comma or space separated. These are probed before provider and common selectors.</span>
+              </span>
+              <input type="text" id="setting-custom-dkim-selectors" value="${escapeHtml(settings.customDkimSelectors.join(', '))}" placeholder="e.g. s1 selector1 mail" autocomplete="off" spellcheck="false" />
+            </label>
             <label class="settings-row">
               <span class="settings-row__text">
                 <strong>Treat DNS resolution errors as failure</strong>
@@ -686,6 +917,15 @@ function renderSettings(): void {
         });
       });
     });
+
+  const customDkimSelectors = document.getElementById(
+    'setting-custom-dkim-selectors',
+  ) as HTMLInputElement | null;
+  customDkimSelectors?.addEventListener('change', () => {
+    void persistSettingsAndRefresh({
+      customDkimSelectors: parseSelectorList(customDkimSelectors.value),
+    });
+  });
 }
 
 function bindMailInfraCopyButtons(): void {
@@ -702,6 +942,61 @@ function bindSettingsFab(): void {
   document.getElementById('btn-open-settings')?.addEventListener('click', () => {
     currentView = 'settings';
     renderSettings();
+  });
+}
+
+function parseSelectorList(raw: string): string[] {
+  const seen = new Set<string>();
+  const selectors: string[] = [];
+  for (const part of raw.split(/[\s,]+/)) {
+    const selector = part.trim();
+    if (!selector || selector.includes('.')) continue;
+    const key = selector.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    selectors.push(selector);
+  }
+  return selectors.slice(0, 20);
+}
+
+function hostnameFromManualInput(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const u = new URL(withScheme);
+    const host = u.hostname.trim().toLowerCase().replace(/\.+$/, '');
+    return host || null;
+  } catch {
+    return trimmed
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      .split(':')[0]
+      .trim()
+      .replace(/\.+$/, '') || null;
+  }
+}
+
+function bindManualLookupForm(): void {
+  const form = document.getElementById('manual-lookup-form');
+  const input = document.getElementById('manual-lookup-domain');
+  if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) {
+    return;
+  }
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const host = hostnameFromManualInput(input.value);
+    if (!host) {
+      input.focus();
+      return;
+    }
+    lastResult = null;
+    compareResult = null;
+    currentView = 'main';
+    void runCheck('apex', host, false);
   });
 }
 
@@ -728,7 +1023,8 @@ function bindWelcomeActions(): void {
 function partialNeedsDnsRefresh(partial: Partial<ExtensionSettings>): boolean {
   return (
     partial.treatDnsResolutionErrorsAsFailure !== undefined ||
-    partial.dnsProvider !== undefined
+    partial.dnsProvider !== undefined ||
+    partial.customDkimSelectors !== undefined
   );
 }
 
@@ -750,13 +1046,19 @@ async function persistSettingsAndRefresh(
   if (currentView === 'settings') {
     if (dnsRefresh) {
       try {
-        const result = await runDnsCheck(tabHostname, lastMode, {
+        const refreshHost = lastResult?.tabHostname ?? tabHostname;
+        const result = await runDnsCheck(refreshHost, lastMode, {
           treatDnsResolutionErrorsAsFailure:
             settings.treatDnsResolutionErrorsAsFailure,
           dnsProvider: settings.dnsProvider,
+          customDkimSelectors: settings.customDkimSelectors,
         });
         lastResult = result;
-        await syncToolbarIconFromResult(result);
+        compareResult = null;
+        compareRequestId++;
+        if (lastResultUpdatesToolbar) {
+          await syncToolbarIconFromResult(result);
+        }
       } catch {
         /* keep prior lastResult */
       }
@@ -776,33 +1078,49 @@ async function persistSettingsAndRefresh(
   }
 }
 
-function bindModeButtons(mode: CheckMode, loading: boolean): void {
+function bindModeButtons(
+  mode: CheckMode,
+  loading: boolean,
+  hostname: string,
+  updateToolbar = true,
+): void {
   const apex = document.getElementById('btn-mode-apex');
   const exact = document.getElementById('btn-mode-exact');
   if (loading) {
-    apex?.addEventListener('click', () => void runCheck('apex'));
-    exact?.addEventListener('click', () => void runCheck('exact'));
+    apex?.addEventListener('click', () => void runCheck('apex', hostname, updateToolbar));
+    exact?.addEventListener('click', () => void runCheck('exact', hostname, updateToolbar));
     return;
   }
   apex?.addEventListener('click', () => {
-    if (mode !== 'apex') void runCheck('apex');
+    if (mode !== 'apex') void runCheck('apex', hostname, updateToolbar);
   });
   exact?.addEventListener('click', () => {
-    if (mode !== 'exact') void runCheck('exact');
+    if (mode !== 'exact') void runCheck('exact', hostname, updateToolbar);
   });
 }
 
-async function runCheck(mode: CheckMode): Promise<void> {
+async function runCheck(
+  mode: CheckMode,
+  hostname = tabHostname,
+  updateToolbar = true,
+): Promise<void> {
   lastMode = mode;
-  renderLoading(mode);
+  compareResult = null;
+  compareRequestId++;
+  lastResultUpdatesToolbar = updateToolbar;
+  renderLoading(mode, hostname);
   try {
-    const result = await runDnsCheck(tabHostname, mode, {
+    const result = await runDnsCheck(hostname, mode, {
       treatDnsResolutionErrorsAsFailure:
         settings.treatDnsResolutionErrorsAsFailure,
       dnsProvider: settings.dnsProvider,
+      customDkimSelectors: settings.customDkimSelectors,
     });
     lastResult = result;
-    await syncToolbarIconFromResult(result);
+    lastResultUpdatesToolbar = updateToolbar;
+    if (updateToolbar) {
+      await syncToolbarIconFromResult(result);
+    }
     if (currentView === 'settings') {
       return;
     }
